@@ -1,47 +1,6 @@
-### RedFin API
----
-수집한 뉴스 데이터를 API 형태로 제공하는 서비스
+### RedFin UI
 
 ### 환경 설정 & 실행 방법
-```powershell
-# 가상환경 생성
-python -m venv .venv
-
-# 가상환경 활성화
-.\.venv\Scripts\activate
-
-# 의존성 설치
-pip install -r requirements.txt
-
-# 실행
-# python run.py (선택)
-python src/redfin_api/main.py
-...
-INFO:     Started server process [452]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit) 
-```
-
-
-### 버전 정책
----
-- Node.js: 22 LTS 계열(예: 22.x)
-- 패키지 매니저: pnpm 10.14.x (최신 10.x 계열)
-- npm: 11.x(최신) — pnpm을 기본 사용, npm은 보조
-- React: 18.3.1
-- Next.js: 14.2.31 (React 18 + App Router 안정)
-    - 사유: Next 15는 App Router에서 React 19(또는 canary) 중심. 
-    - React 18을 강제하려면 Pages Router로 가야 하므로, 
-    - React 18 + App Router 조합은 Next 14가 가장 단순·안정적입니다. 
-    - 또한 14.x는 2025-07 최신 보안 패치 14.2.31이 배포되어 있습니다.
-- Tailwind CSS: 4.1.x (v4 안정 릴리스)
-- shadcn/ui: CLI 최신(@latest) 사용 (2025-02 레지스트리 스키마 업데이트 반영)
-
-대안: Next 15를 쓰고 싶다면 Pages Router + React 18은 가능(호환 유지). 
-단, App Router는 React 19 트랙이므로 본 문서의 “React 18 고정” 가정과 다릅니다.
-
-
 ```bash
 # Install NVM
 echo "Installing NVM..."
@@ -116,3 +75,20 @@ Installing devDependencies:
 - eslint-config-next
 - @eslint/eslintrc
 ```
+
+### 버전 정책
+---
+- Node.js: 22 LTS 계열(예: 22.x)
+- 패키지 매니저: pnpm 10.14.x (최신 10.x 계열)
+- npm: 11.x(최신) — pnpm을 기본 사용, npm은 보조
+- React: 18.3.1
+- Next.js: 14.2.31 (React 18 + App Router 안정)
+    - 사유: Next 15는 App Router에서 React 19(또는 canary) 중심. 
+    - React 18을 강제하려면 Pages Router로 가야 하므로, 
+    - React 18 + App Router 조합은 Next 14가 가장 단순·안정적입니다. 
+    - 또한 14.x는 2025-07 최신 보안 패치 14.2.31이 배포되어 있습니다.
+- Tailwind CSS: 4.1.x (v4 안정 릴리스)
+- shadcn/ui: CLI 최신(@latest) 사용 (2025-02 레지스트리 스키마 업데이트 반영)
+
+대안: Next 15를 쓰고 싶다면 Pages Router + React 18은 가능(호환 유지). 
+단, App Router는 React 19 트랙이므로 본 문서의 “React 18 고정” 가정과 다릅니다.

@@ -22,6 +22,9 @@ lint: ## 코드 린팅
 	flake8 src/ tests/
 	mypy src/
 
+type-check: ## 타입 체크
+	mypy src/
+
 format: ## 코드 포맷팅
 	black src/ tests/
 	isort src/ tests/
