@@ -9,6 +9,8 @@ AI RSS News API Service with FastAPI
 - 실시간 검색 및 필터링
 - 신선도 기반 정렬
 - RESTful API 인터페이스
+- 자동 CORS 설정
+- 전역 예외 처리
 
 ## 📋 요구사항
 
@@ -52,9 +54,6 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # 의존성 설치
-pip install -r requirements.txt
-
-# 개발 모드 설치
 pip install -e .
 ```
 
@@ -79,8 +78,8 @@ MONGO_COL=news
 
 #### 파일 백엔드 사용 시
 ```bash
-# 샘플 데이터 파일 생성 (없는 경우)
-echo '{"source": "Test", "title": "Test News", "link": "https://example.com", "published": "2024-01-01T12:00:00Z", "summary": "Test summary", "authors": ["Test Author"], "tags": ["test"]}' > src/redfin_api/ai_news.jsonl
+# 샘플 데이터 파일 생성
+echo '{"source": "Test", "title": "Test News", "link": "https://example.com", "published": "2024-01-01T12:00:00Z", "summary": "Test summary", "authors": ["Test Author"], "tags": ["test"]}' > data/ai_news.jsonl
 ```
 
 #### MongoDB 백엔드 사용 시
@@ -222,9 +221,24 @@ make check
 GET /health
 ```
 
+**응답 예시:**
+```json
+{
+  "ok": true,
+  "count": 150,
+  "backend": "FILE",
+  "version": "0.1.0"
+}
+```
+
 ### 뉴스 소스 목록
 ```http
 GET /sources
+```
+
+**응답 예시:**
+```json
+["TechCrunch", "Ars Technica", "VentureBeat"]
 ```
 
 ### 뉴스 목록 조회
@@ -239,6 +253,21 @@ GET /news?q=검색어&source=소스명&limit=20&offset=0&sort=fresh&refresh=fals
 - `offset`: 오프셋 (기본값: 0)
 - `sort`: 정렬 방식 (`fresh` 또는 `time`, 기본값: `fresh`)
 - `refresh`: 캐시 새로고침 (기본값: `false`)
+
+**응답 예시:**
+```json
+[
+  {
+    "source": "TechCrunch",
+    "title": "AI Breakthrough in Natural Language Processing",
+    "link": "https://techcrunch.com/2024/01/01/ai-breakthrough",
+    "published": "2024-01-01T12:00:00Z",
+    "summary": "Researchers have achieved a major breakthrough...",
+    "authors": ["John Doe"],
+    "tags": ["AI", "NLP", "Research"]
+  }
+]
+```
 
 ## 📊 데이터 형식
 
@@ -255,6 +284,14 @@ GET /news?q=검색어&source=소스명&limit=20&offset=0&sort=fresh&refresh=fals
   "tags": ["태그1", "태그2"]
 }
 ```
+
+### 정렬 방식
+
+- **`fresh`**: 신선도 점수 기반 정렬 (기본값)
+  - 최근 발행된 뉴스가 높은 점수
+  - 시간이 지날수록 점수 감소
+- **`time`**: 발행 시간 순 정렬
+  - 최신 뉴스가 먼저 표시
 
 ## 🧪 개발
 
@@ -307,11 +344,9 @@ redfin_api/
 ├── src/
 │   └── redfin_api/
 │       ├── __init__.py          # 패키지 초기화
-│       ├── app.py               # FastAPI 앱 (기존)
-│       ├── main.py              # FastAPI 앱 (새로 생성)
+│       ├── main.py              # FastAPI 앱 (메인 파일)
 │       ├── models.py            # Pydantic 모델
-│       ├── config.py            # 설정 관리
-│       └── ai_news.jsonl        # 샘플 뉴스 데이터
+│       └── config.py            # 설정 관리
 ├── scripts/
 │   ├── start.sh                # Linux/macOS 시작 스크립트
 │   └── start.ps1               # Windows 시작 스크립트
@@ -319,9 +354,9 @@ redfin_api/
 │   ├── __init__.py
 │   ├── conftest.py             # pytest 설정
 │   └── test_api.py             # API 테스트
+├── data/                       # 데이터 파일 디렉토리
 ├── run.py                      # 메인 실행 스크립트
 ├── pyproject.toml              # 프로젝트 설정 (uv)
-├── requirements.txt            # pip 의존성
 ├── env.example                 # 환경 변수 예제
 ├── .gitignore                  # Git 무시 파일
 ├── .dockerignore               # Docker 무시 파일
@@ -346,7 +381,7 @@ which python  # venv 경로인지 확인
 # 3. 의존성 재설치
 uv sync
 # 또는
-pip install -r requirements.txt
+pip install -e .
 ```
 
 #### 뉴스 파일을 찾을 수 없는 경우
@@ -355,10 +390,11 @@ pip install -r requirements.txt
 echo $NEWS_FILE
 
 # 2. 파일 존재 확인
-ls -la src/redfin_api/ai_news.jsonl
+ls -la data/ai_news.jsonl
 
 # 3. 샘플 데이터 생성
-echo '{"source": "Test", "title": "Test News", "link": "https://example.com", "published": "2024-01-01T12:00:00Z", "summary": "Test summary", "authors": ["Test Author"], "tags": ["test"]}' > src/redfin_api/ai_news.jsonl
+mkdir -p data
+echo '{"source": "Test", "title": "Test News", "link": "https://example.com", "published": "2024-01-01T12:00:00Z", "summary": "Test summary", "authors": ["Test Author"], "tags": ["test"]}' > data/ai_news.jsonl
 ```
 
 #### MongoDB 연결 오류
@@ -412,6 +448,31 @@ pytest tests/ -v
 # 특정 테스트만 실행
 pytest tests/test_api.py::test_health_endpoint -v
 ```
+
+## 🚀 성능 최적화
+
+### 캐시 관리
+- 뉴스 데이터는 메모리에 캐시됨
+- `refresh=true` 파라미터로 캐시 강제 새로고침
+- 파일 백엔드: 파일 변경 시 수동 새로고침 필요
+- MongoDB 백엔드: 실시간 데이터 업데이트
+
+### 검색 최적화
+- 제목, 요약, 태그에서 텍스트 검색
+- 소스별 필터링으로 검색 범위 제한
+- 페이지네이션으로 대용량 데이터 처리
+
+## 🔒 보안
+
+### CORS 설정
+- 기본적으로 모든 도메인 허용 (`CORS_ORIGINS=*`)
+- 프로덕션 환경에서는 특정 도메인만 허용하도록 설정
+- 환경 변수 `CORS_ORIGINS`로 제어
+
+### 입력 검증
+- Pydantic 모델을 통한 자동 입력 검증
+- 쿼리 파라미터 범위 제한 (limit: 1-100)
+- 정렬 방식 패턴 검증
 
 ## 🤝 기여
 

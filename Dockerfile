@@ -1,4 +1,4 @@
-# RedFin API Dockerfile
+# RedFin API Dockerfile (대안 - pip 사용)
 
 FROM python:3.11-slim
 
@@ -10,12 +10,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 의존성 파일 복사
-COPY pyproject.toml uv.lock ./
-
-# uv 설치 및 의존성 설치
-RUN pip install uv && \
-    uv sync --frozen --no-dev
+# requirements.txt 파일 복사 및 설치
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 소스 코드 복사
 COPY src/ ./src/

@@ -40,7 +40,7 @@ dev = [
 ]
 
 [project.scripts]
-redfin-api = "redfin_api.main:app"
+redfin-api = "src.redfin_api.main:app"
 
 [project.urls]
 Homepage = "https://github.com/redfin/redfin-api"

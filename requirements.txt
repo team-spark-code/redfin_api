@@ -1,5 +1,5 @@
 # RedFin API 의존성
-# Python 3.10+ 필요
+# pyproject.toml에서 자동 생성
 
 # 핵심 의존성
 fastapi>=0.115.0
@@ -7,8 +7,6 @@ uvicorn[standard]>=0.30.0
 pydantic>=2.8.0
 python-dateutil>=2.9.0.post0
 python-dotenv>=1.0.0
-
-# MongoDB 백엔드 (선택사항)
 pymongo>=4.7.0
 
 # 개발 의존성 (선택사항)
