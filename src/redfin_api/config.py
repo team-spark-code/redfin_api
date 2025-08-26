@@ -8,7 +8,7 @@ from typing import Optional
 BACKEND = os.getenv("BACKEND", "FILE").upper()
 
 # 파일 백엔드 설정
-NEWS_FILE = Path(os.getenv("NEWS_FILE", "ai_news.jsonl"))
+NEWS_FILE = Path(os.getenv("NEWS_FILE", "data/all_entries_20250825_025249.jsonl"))
 
 # MongoDB 백엔드 설정
 MONGO_URI: Optional[str] = os.getenv("MONGO_URI")

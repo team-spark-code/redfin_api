@@ -5,8 +5,10 @@ AI RSS News API Service with FastAPI
 ## 🚀 기능
 
 - RSS 뉴스 피드 API 서비스
+- **새로운**: `sample.json` 구조에 맞는 뉴스 description API
 - 파일 및 MongoDB 백엔드 지원
 - 실시간 검색 및 필터링
+- 소스별, 그룹별 필터링
 - 신선도 기반 정렬
 - RESTful API 인터페이스
 - 자동 CORS 설정
@@ -241,6 +243,54 @@ GET /sources
 ["TechCrunch", "Ars Technica", "VentureBeat"]
 ```
 
+### 뉴스 그룹 목록
+```http
+GET /groups
+```
+
+**응답 예시:**
+```json
+["academia", "cloud_ai", "ecosystem", "frontier_lab", "industry", "media", "open_research"]
+```
+
+### 뉴스 Description 조회 (새로운!)
+```http
+GET /news/descriptions?q=검색어&source=소스명&group=그룹명&limit=20&offset=0&sort=fresh&refresh=false
+```
+
+#### 쿼리 파라미터:
+- `q`: 검색어 (선택사항)
+- `source`: 특정 소스 필터 (선택사항)
+- `group`: 특정 그룹 필터 (선택사항)
+- `limit`: 조회 개수 (1-100, 기본값: 20)
+- `offset`: 오프셋 (기본값: 0)
+- `sort`: 정렬 방식 (`fresh` 또는 `time`, 기본값: `fresh`)
+- `refresh`: 캐시 새로고침 (기본값: `false`)
+
+**응답 예시:**
+```json
+{
+  "success": true,
+  "count": 2,
+  "data": [
+    {
+      "guid": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
+      "source": "OpenAI Blog (공식, 변경 가능성 주의)",
+      "title": "Accelerating life sciences research",
+      "link": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
+      "pub_date": "Fri, 22 Aug 2025 08:30:00 GMT",
+      "description": "Discover how a specialized AI model, GPT-4b micro, helped OpenAI and Retro Bio engineer more effective proteins for stem cell therapy and longevity research.",
+      "author": "",
+      "category": "",
+      "tags": [],
+      "group": "frontier_lab",
+      "scraped_at": "2025-08-25T02:51:21.590956"
+    }
+  ],
+  "total": 756
+}
+```
+
 ### 뉴스 목록 조회
 ```http
 GET /news?q=검색어&source=소스명&limit=20&offset=0&sort=fresh&refresh=false
@@ -271,7 +321,7 @@ GET /news?q=검색어&source=소스명&limit=20&offset=0&sort=fresh&refresh=fals
 
 ## 📊 데이터 형식
 
-### 뉴스 아이템 구조
+### 뉴스 아이템 구조 (기존 API)
 
 ```json
 {
@@ -285,6 +335,26 @@ GET /news?q=검색어&source=소스명&limit=20&offset=0&sort=fresh&refresh=fals
 }
 ```
 
+### 뉴스 Description 구조 (새로운 API)
+
+`sample.json`과 동일한 구조로 제공됩니다:
+
+```json
+{
+  "guid": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
+  "source": "OpenAI Blog (공식, 변경 가능성 주의)",
+  "title": "Accelerating life sciences research",
+  "link": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
+  "pub_date": "Fri, 22 Aug 2025 08:30:00 GMT",
+  "description": "Discover how a specialized AI model, GPT-4b micro, helped OpenAI and Retro Bio engineer more effective proteins for stem cell therapy and longevity research.",
+  "author": "",
+  "category": "",
+  "tags": [],
+  "group": "frontier_lab",
+  "scraped_at": "2025-08-25T02:51:21.590956"
+}
+```
+
 ### 정렬 방식
 
 - **`fresh`**: 신선도 점수 기반 정렬 (기본값)
@@ -292,6 +362,62 @@ GET /news?q=검색어&source=소스명&limit=20&offset=0&sort=fresh&refresh=fals
   - 시간이 지날수록 점수 감소
 - **`time`**: 발행 시간 순 정렬
   - 최신 뉴스가 먼저 표시
+
+## 💡 사용 예시
+
+### 기본 뉴스 조회
+```bash
+# 최신 뉴스 10개 조회
+curl "http://localhost:8000/news?limit=10"
+
+# 특정 소스의 뉴스만 조회
+curl "http://localhost:8000/news?source=OpenAI%20Blog&limit=5"
+
+# 검색어로 뉴스 검색
+curl "http://localhost:8000/news?q=GPT-4&limit=10"
+```
+
+### 새로운 Description API 사용
+```bash
+# frontier_lab 그룹의 뉴스 5개 조회
+curl "http://localhost:8000/news/descriptions?group=frontier_lab&limit=5"
+
+# 특정 소스와 그룹으로 필터링
+curl "http://localhost:8000/news/descriptions?source=OpenAI%20Blog&group=frontier_lab&limit=3"
+
+# description에서 검색
+curl "http://localhost:8000/news/descriptions?q=protein&limit=10"
+
+# 모든 그룹 목록 확인
+curl "http://localhost:8000/groups"
+
+# 모든 소스 목록 확인
+curl "http://localhost:8000/sources"
+```
+
+### Python 클라이언트 예시
+```python
+import requests
+
+# API 기본 URL
+base_url = "http://localhost:8000"
+
+# 뉴스 description 조회
+response = requests.get(f"{base_url}/news/descriptions", params={
+    "group": "frontier_lab",
+    "limit": 5,
+    "sort": "fresh"
+})
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"총 {data['total']}개 뉴스 중 {data['count']}개 조회됨")
+    
+    for news in data['data']:
+        print(f"- {news['title']} ({news['source']})")
+        print(f"  {news['description'][:100]}...")
+        print()
+```
 
 ## 🧪 개발
 
