@@ -1,0 +1,55 @@
+version: '3.8'
+
+# 프로덕션 환경용
+services:
+  redfin-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: redfin-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=false
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data:ro
+    networks:
+      - redfin-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 개발 환경용 (선택사항)
+  redfin-api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: redfin-api-dev
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=true
+      - PYTHONPATH=/app
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data:ro
+    networks:
+      - redfin-network
+    profiles:
+      - dev
+
+networks:
+  redfin-network:
+    driver: bridge
