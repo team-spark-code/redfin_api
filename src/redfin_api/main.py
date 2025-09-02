@@ -13,14 +13,14 @@ import logging
 try:
     from .models import NewsOut, HealthResponse, NewsQuery, NewsEntry, NewsDescriptionResponse
     from .config import (
-        BACKEND, NEWS_FILE, MONGO_URI, MONGO_DB, MONGO_COL,
+        BACKEND, NEWS_FOLDER, MONGO_URI, MONGO_DB, MONGO_COL,
         API_HOST, API_PORT, API_RELOAD, CORS_ORIGINS
     )
 except ImportError:
     # 직접 실행 시 절대 import 사용
     from models import NewsOut, HealthResponse, NewsQuery, NewsEntry, NewsDescriptionResponse
     from config import (
-        BACKEND, NEWS_FILE, MONGO_URI, MONGO_DB, MONGO_COL,
+        BACKEND, NEWS_FOLDER, MONGO_URI, MONGO_DB, MONGO_COL,
         API_HOST, API_PORT, API_RELOAD, CORS_ORIGINS
     )
 
@@ -153,52 +153,17 @@ def _load_file() -> List[Dict[str, Any]]:
     """파일 백엔드에서 데이터 로드"""
     items = []
     
-    # 여러 가능한 경로를 시도
-    possible_paths = [
-        NEWS_FILE,
-        Path("data/extract_20250826_105701.json"),
-    ]
-    print(f"NEWS_FILE: {NEWS_FILE}")
-
-    file_loaded = False
-    for file_path in possible_paths:
-        if file_path.exists():
-            try:
-                logger.info(f"뉴스 파일 로드 시도: {file_path}")
-                with file_path.open("r", encoding="utf-8") as f:
-                    # 파일 확장자에 따라 다른 읽기 방식 사용
-                    if file_path.suffix == ".jsonl":
-                        # JSONL 파일: 한 줄씩 읽기
-                        for line_num, line in enumerate(f, 1):
-                            try:
-                                if line.strip():  # 빈 줄 무시
-                                    items.append(json.loads(line.strip()))
-                            except json.JSONDecodeError as e:
-                                logger.warning(f"JSONL 파싱 오류 (라인 {line_num}): {e}")
-                    else:
-                        # JSON 파일: 배열 형태로 읽기
-                        try:
-                            data = json.load(f)
-                            if isinstance(data, list):
-                                items = data
-                            else:
-                                logger.error(f"JSON 파일이 배열 형태가 아닙니다: {file_path}")
-                                continue
-                        except json.JSONDecodeError as e:
-                            logger.error(f"JSON 파싱 오류 ({file_path}): {e}")
-                            continue
-                        
-                file_loaded = True
-                logger.info(f"뉴스 파일 로드 성공: {file_path} ({len(items)}개 아이템)")
-                break
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON 파싱 오류 ({file_path}): {e}")
-            except Exception as e:
-                logger.error(f"파일 읽기 오류 ({file_path}): {e}")
+    # 데이터 폴더 내 모든 JSON 파일 로드
+    for json_file in NEWS_FOLDER.glob("*.json"):
+        logger.info(f"Loading JSON file: {json_file}")
+        with json_file.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                items.extend(data)
+            else:
+                logger.error(f"JSON 파일이 배열 형태가 아닙니다: {json_file}")
     
-    if not file_loaded:
-        logger.error(f"뉴스 파일을 찾을 수 없습니다. 시도한 경로들: {[str(p) for p in possible_paths]}")
-    
+    logger.info(f"파일 백엔드에서 {len(items)}개 아이템 로드")
     return items
 
 def _load_mongo() -> List[Dict[str, Any]]:
@@ -228,6 +193,15 @@ def _load_data() -> List[Dict[str, Any]]:
 # 초기 데이터 로드
 _news_cache = _load_data()
 logger.info(f"초기 데이터 로드 완료: {len(_news_cache)}개 아이템")
+
+# 프로젝트 루트 디렉터리 설정
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_DIR = BASE_DIR / "data"
+
+# JSON 파일 경로 설정
+body_file_path = DATA_DIR / "redfin.rss_body_20250901.json"
+yake_file_path = DATA_DIR / "redfin.rss_yake_20250901.json"
+desc_file_path = DATA_DIR / "redfin.rss_description_20250901.json"
 
 @app.get("/")
 def root():
@@ -497,6 +471,117 @@ def list_extract_news(
         return extract_news_entries
     except Exception as e:
         logger.error(f"Extract 뉴스 아이템 변환 오류: {e}")
+        raise HTTPException(status_code=500, detail="데이터 변환 오류")
+
+@app.get("/news/full", response_model=List[NewsEntry])
+def list_full_news(
+    q: Optional[str] = Query(None, description="검색어"),
+    source: Optional[str] = Query(None, description="특정 소스 필터"),
+    limit: int = Query(20, ge=1, le=100, description="조회 개수"),
+    offset: int = Query(0, ge=0, description="오프셋"),
+    sort: str = Query("fresh", pattern="^(fresh|time)$", description="정렬 방식"),
+    refresh: bool = Query(False, description="캐시 새로고침")
+):
+    """기사 원문, 키워드, 요약문을 포함한 뉴스 목록 조회"""
+    global _news_cache
+    
+    if refresh:
+        logger.info("캐시 새로고침 요청")
+        _news_cache = _load_data()
+
+    now_ts = time.time()
+    items = _news_cache.copy()  # 원본 데이터 사용
+
+    # 소스 필터링
+    if source:
+        items = [n for n in items if n.get("source") == source]
+
+    # 검색어 필터링
+    if q:
+        ql = q.lower()
+        def hit(n): 
+            return any(ql in (n.get(k) or "").lower() for k in ("title", "summary", "article_text")) or \
+                   ql in " ".join(n.get("tags") or []).lower()
+        items = [n for n in items if hit(n)]
+
+    # 정렬
+    if sort == "fresh":
+        items = sorted(items, key=lambda n: _freshness_score(n, now_ts), reverse=True)
+    else:
+        items = sorted(items, key=lambda n: n.get("processed_at") or n.get("published") or "", reverse=True)
+
+    # 페이지네이션
+    result_items = items[offset:offset + limit]
+    
+    try:
+        # NewsEntry 모델로 변환
+        full_news_entries = []
+        # JSON 파일에서 데이터 읽기
+        logger.info(f"Loading JSON file: {body_file_path}")
+        with body_file_path.open("r", encoding="utf-8") as f_body:
+            body_data = json.load(f_body)
+
+        logger.info(f"Loading JSON file: {yake_file_path}")
+        with yake_file_path.open("r", encoding="utf-8") as f_yake:
+            yake_data = json.load(f_yake)
+
+        logger.info(f"Loading JSON file: {desc_file_path}")
+        with desc_file_path.open("r", encoding="utf-8") as f_desc:
+            desc_data = json.load(f_desc)
+
+        # 데이터 매핑
+        for item in result_items:
+            try:
+                # 각 항목이 리스트라면, 리스트를 순회하면서 딕셔너리에 접근
+                if isinstance(item, list):
+                    for sub_item in item:
+                        full_data = {
+                            "guid": sub_item.get("guid", ""),
+                            "source": sub_item.get("source", ""),
+                            "title": sub_item.get("title", ""),
+                            "link": sub_item.get("link", ""),
+                            "article_text": body_data.get(sub_item.get("guid"), ""),
+                            "summary": desc_data.get(sub_item.get("guid"), ""),
+                            "tags": yake_data.get(sub_item.get("guid"), []),
+                            "content_type": sub_item.get("content_type", "NEWS"),
+                            "language": sub_item.get("language", "ENGLISH"),
+                            "readability_score": sub_item.get("readability_score"),
+                            "key_entities": sub_item.get("key_entities", []),
+                            "processed_at": sub_item.get("processed_at"),
+                            "text_length": sub_item.get("text_length")
+                        }
+                        full_entry = NewsEntry(**full_data)
+                        full_news_entries.append(full_entry)
+                else:
+                    # 기존 로직
+                    full_data = {
+                        "guid": item.get("guid", ""),
+                        "source": item.get("source", ""),
+                        "title": item.get("title", ""),
+                        "link": item.get("link", ""),
+                        "article_text": body_data.get(item.get("guid"), ""),
+                        "summary": desc_data.get(item.get("guid"), ""),
+                        "tags": yake_data.get(item.get("guid"), []),
+                        "content_type": item.get("content_type", "NEWS"),
+                        "language": item.get("language", "ENGLISH"),
+                        "readability_score": item.get("readability_score"),
+                        "key_entities": item.get("key_entities", []),
+                        "processed_at": item.get("processed_at"),
+                        "text_length": item.get("text_length")
+                    }
+                    full_entry = NewsEntry(**full_data)
+                    full_news_entries.append(full_entry)
+            except Exception as e:
+                logger.warning(f"Full 뉴스 엔트리 변환 오류 (guid: {item.get('guid', 'unknown')}): {e}")
+                continue
+        
+        # 데이터가 일부 빠져도 서버가 시작되도록 보장
+        if not full_news_entries:
+            logger.warning("데이터가 일부 누락되었지만 서버를 시작합니다.")
+            return []
+        return full_news_entries
+    except Exception as e:
+        logger.error(f"Full 뉴스 아이템 변환 오류: {e}")
         raise HTTPException(status_code=500, detail="데이터 변환 오류")
 
 @app.exception_handler(Exception)
