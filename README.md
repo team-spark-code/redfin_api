@@ -1,606 +1,182 @@
 # RedFin API
 
-AI RSS News API Service with FastAPI
+AI RSS News API Service - FastAPI 기반 뉴스 추천 및 분석 서비스
 
-## 🚀 기능
+## 🏗️ 프로젝트 구조
 
-- RSS 뉴스 피드 API 서비스
-- **새로운**: `sample.json` 구조에 맞는 뉴스 description API
-- 파일 및 MongoDB 백엔드 지원
-- 실시간 검색 및 필터링
-- 소스별, 그룹별 필터링
-- 신선도 기반 정렬
-- RESTful API 인터페이스
-- 자동 CORS 설정
-- 전역 예외 처리
-
-## 📋 요구사항
-
-- **Python**: 3.10 이상
-- **패키지 관리자**: uv (권장) 또는 pip
-- **데이터 백엔드**: 파일 시스템 또는 MongoDB (선택사항)
-- **운영체제**: Windows, macOS, Linux
-
-## 🛠️ 환경 설정
-
-### 1. 저장소 클론
-
-```bash
-git clone <repository-url>
-cd redfin_api
+```
+redfin_api/
+├── app/                    # FastAPI 애플리케이션
+│   ├── api/               # API 라우터
+│   │   └── news.py        # 뉴스 관련 엔드포인트
+│   ├── core/              # 핵심 설정 및 의존성
+│   │   └── config.py      # 애플리케이션 설정
+│   ├── models/            # 데이터베이스 모델
+│   ├── schemas/           # Pydantic 스키마
+│   │   └── news.py        # 뉴스 관련 스키마
+│   ├── services/          # 비즈니스 로직
+│   │   └── news_service.py # 뉴스 서비스
+│   ├── utils/             # 유틸리티 함수
+│   │   └── data_loader.py # 데이터 로더
+│   ├── __init__.py
+│   └── main.py            # FastAPI 앱 메인
+├── data/                  # 데이터 파일
+├── tests/                 # 테스트 코드
+├── .env                   # 환경 변수
+├── requirements.txt       # Python 의존성
+├── run_app.py            # 애플리케이션 실행 스크립트
+└── README.md
 ```
 
-### 2. Python 환경 설정
+## 🚀 빠른 시작
 
-#### uv 사용 (권장)
+### 1. 환경 설정
+
 ```bash
-# uv 설치 (없는 경우)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 가상환경 생성 및 의존성 설치
-uv sync
-
-# 개발 의존성 포함 설치
-uv sync --extra dev
-```
-
-#### pip 사용
-```bash
-# 가상환경 생성
-python -m venv venv
-
-# 가상환경 활성화
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
+# 가상환경 생성 및 활성화
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# 또는
+.venv\Scripts\activate     # Windows
 
 # 의존성 설치
-pip install -e .
+pip install -r requirements.txt
 ```
 
-### 3. 환경 변수 설정
+### 2. 환경 변수 설정
 
-#### 기본 설정 (파일 백엔드)
-```bash
-# env.example을 복사하여 .env 파일 생성
-cp env.example .env
-```
+`.env` 파일을 생성하고 필요한 설정을 추가하세요:
 
-#### 고급 설정 (MongoDB 백엔드)
-```bash
-# .env 파일 편집
-BACKEND=MONGO
+```env
+# 백엔드 설정
+BACKEND=FILE  # FILE 또는 MONGO
+
+# 파일 백엔드 설정
+NEWS_FILE=data/all_entries_20250825_025249.jsonl
+
+# MongoDB 백엔드 설정 (선택사항)
 MONGO_URI=mongodb://localhost:27017
 MONGO_DB=redfin
 MONGO_COL=news
+
+# API 서버 설정
+API_HOST=0.0.0.0
+API_PORT=8000
+API_RELOAD=false
+
+# CORS 설정
+CORS_ORIGINS=*
 ```
 
-### 4. 데이터 파일 준비
-
-#### 파일 백엔드 사용 시
-```bash
-# 샘플 데이터 파일 생성
-echo '{"source": "Test", "title": "Test News", "link": "https://example.com", "published": "2024-01-01T12:00:00Z", "summary": "Test summary", "authors": ["Test Author"], "tags": ["test"]}' > data/ai_news.jsonl
-```
-
-#### MongoDB 백엔드 사용 시
-```bash
-# MongoDB 설치 및 실행
-# Ubuntu/Debian
-sudo apt-get install mongodb
-
-# macOS (Homebrew)
-brew install mongodb-community
-brew services start mongodb-community
-
-# Windows
-# MongoDB Community Server 다운로드 및 설치
-```
-
-## 🚀 실행 방법
-
-### 방법 1: Makefile 사용 (권장)
+### 3. 애플리케이션 실행
 
 ```bash
-# 도움말 확인
-make help
+# 방법 1: Python 스크립트로 실행
+python run_app.py
 
-# 서버 실행
-make run
+# 방법 2: uvicorn으로 직접 실행
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# 개발 모드 실행 (자동 재시작)
-make run-dev
-```
-
-### 방법 2: 실행 스크립트 사용
-
-#### Windows PowerShell
-```powershell
-# 스크립트 실행 권한 설정 (필요시)
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# 서버 실행
-.\scripts\start.ps1
-```
-
-#### Linux/macOS
-```bash
-# 스크립트 실행 권한 설정
-chmod +x scripts/start.sh
-
-# 서버 실행
-./scripts/start.sh
-```
-
-### 방법 3: 직접 실행
-
-```bash
-# Python 스크립트로 실행
+# 방법 3: 기존 run.py 사용 (하위 호환성)
 python run.py
-
-# uvicorn으로 직접 실행
-uvicorn src.redfin_api.main:app --reload --host 0.0.0.0 --port 8000
-
-# 모듈로 실행
-python -m src.redfin_api.main
 ```
-
-### 방법 4: Docker 사용
-
-```bash
-# Docker Compose로 실행 (권장)
-docker-compose up -d
-
-# MongoDB 포함 실행
-docker-compose --profile mongo up -d
-
-# Docker 이미지 직접 빌드 및 실행
-make docker-build
-make docker-run
-```
-
-## 🔧 개발 환경 설정
-
-### 개발 도구 설치
-
-```bash
-# 개발 의존성 설치
-uv sync --extra dev
-
-# 또는 pip 사용
-pip install -e ".[dev]"
-```
-
-### 코드 품질 관리
-
-```bash
-# 코드 포맷팅
-make format
-
-# 린팅 검사
-make lint
-
-# 타입 체크
-make type-check
-
-# 테스트 실행
-make test
-
-# 모든 검사 실행
-make check
-```
-
-### IDE 설정
-
-#### VS Code
-```json
-// .vscode/settings.json
-{
-    "python.defaultInterpreterPath": "./venv/bin/python",
-    "python.linting.enabled": true,
-    "python.linting.flake8Enabled": true,
-    "python.formatting.provider": "black",
-    "python.sortImports.args": ["--profile", "black"]
-}
-```
-
-#### PyCharm
-- Project Structure에서 `src`를 Sources Root로 설정
-- Python Interpreter를 가상환경으로 설정
 
 ## 📚 API 문서
 
 서버 실행 후 다음 URL에서 API 문서를 확인할 수 있습니다:
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
 ## 🔌 API 엔드포인트
 
-### 헬스체크
-```http
-GET /health
-```
+### 뉴스 API (`/api/v1/news`)
 
-**응답 예시:**
-```json
-{
-  "ok": true,
-  "count": 150,
-  "backend": "FILE",
-  "version": "0.1.0"
-}
-```
+- `GET /` - 뉴스 목록 조회
+- `GET /description` - 뉴스 description 응답 형식으로 조회
+- `GET /health` - 헬스체크
+- `GET /sources` - 사용 가능한 뉴스 소스 목록
+- `GET /groups` - 사용 가능한 뉴스 그룹 목록
 
-### 뉴스 소스 목록
-```http
-GET /sources
-```
+### 기본 엔드포인트
 
-**응답 예시:**
-```json
-["TechCrunch", "Ars Technica", "VentureBeat"]
-```
+- `GET /` - 루트 정보
+- `GET /health` - 기본 헬스체크
 
-### 뉴스 그룹 목록
-```http
-GET /groups
-```
+## 🔧 주요 기능
 
-**응답 예시:**
-```json
-["academia", "cloud_ai", "ecosystem", "frontier_lab", "industry", "media", "open_research"]
-```
+### 1. 다중 백엔드 지원
+- **파일 백엔드**: JSONL 파일에서 뉴스 데이터 로드
+- **MongoDB 백엔드**: MongoDB에서 뉴스 데이터 조회
 
-### 뉴스 Description 조회 (새로운!)
-```http
-GET /news/descriptions?q=검색어&source=소스명&group=그룹명&limit=20&offset=0&sort=fresh&refresh=false
-```
+### 2. 스마트 검색 및 필터링
+- 텍스트 기반 검색 (제목, 요약, 본문)
+- 소스별, 그룹별 필터링
+- 신선도 점수 기반 정렬
 
-#### 쿼리 파라미터:
-- `q`: 검색어 (선택사항)
-- `source`: 특정 소스 필터 (선택사항)
-- `group`: 특정 그룹 필터 (선택사항)
-- `limit`: 조회 개수 (1-100, 기본값: 20)
-- `offset`: 오프셋 (기본값: 0)
-- `sort`: 정렬 방식 (`fresh` 또는 `time`, 기본값: `fresh`)
-- `refresh`: 캐시 새로고침 (기본값: `false`)
+### 3. 캐싱 시스템
+- 5분간 데이터 캐싱
+- 새로고침 옵션으로 캐시 무효화
 
-**응답 예시:**
-```json
-{
-  "success": true,
-  "count": 2,
-  "data": [
-    {
-      "guid": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
-      "source": "OpenAI Blog (공식, 변경 가능성 주의)",
-      "title": "Accelerating life sciences research",
-      "link": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
-      "pub_date": "Fri, 22 Aug 2025 08:30:00 GMT",
-      "description": "Discover how a specialized AI model, GPT-4b micro, helped OpenAI and Retro Bio engineer more effective proteins for stem cell therapy and longevity research.",
-      "author": "",
-      "category": "",
-      "tags": [],
-      "group": "frontier_lab",
-      "scraped_at": "2025-08-25T02:51:21.590956"
-    }
-  ],
-  "total": 756
-}
-```
+### 4. 데이터 검증
+- Pydantic 스키마를 통한 데이터 검증
+- 필수 필드 확인 및 오류 처리
 
-### 뉴스 목록 조회
-```http
-GET /news?q=검색어&source=소스명&limit=20&offset=0&sort=fresh&refresh=false
-```
-
-#### 쿼리 파라미터:
-- `q`: 검색어 (선택사항)
-- `source`: 특정 소스 필터 (선택사항)
-- `limit`: 조회 개수 (1-100, 기본값: 20)
-- `offset`: 오프셋 (기본값: 0)
-- `sort`: 정렬 방식 (`fresh` 또는 `time`, 기본값: `fresh`)
-- `refresh`: 캐시 새로고침 (기본값: `false`)
-
-**응답 예시:**
-```json
-[
-  {
-    "source": "TechCrunch",
-    "title": "AI Breakthrough in Natural Language Processing",
-    "link": "https://techcrunch.com/2024/01/01/ai-breakthrough",
-    "published": "2024-01-01T12:00:00Z",
-    "summary": "Researchers have achieved a major breakthrough...",
-    "authors": ["John Doe"],
-    "tags": ["AI", "NLP", "Research"]
-  }
-]
-```
-
-## 📊 데이터 형식
-
-### 뉴스 아이템 구조 (기존 API)
-
-```json
-{
-  "source": "뉴스 소스명",
-  "title": "뉴스 제목",
-  "link": "https://example.com/news/123",
-  "published": "2024-01-01T12:00:00Z",
-  "summary": "뉴스 요약",
-  "authors": ["작성자1", "작성자2"],
-  "tags": ["태그1", "태그2"]
-}
-```
-
-### 뉴스 Description 구조 (새로운 API)
-
-`sample.json`과 동일한 구조로 제공됩니다:
-
-```json
-{
-  "guid": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
-  "source": "OpenAI Blog (공식, 변경 가능성 주의)",
-  "title": "Accelerating life sciences research",
-  "link": "https://openai.com/index/accelerating-life-sciences-research-with-retro-biosciences",
-  "pub_date": "Fri, 22 Aug 2025 08:30:00 GMT",
-  "description": "Discover how a specialized AI model, GPT-4b micro, helped OpenAI and Retro Bio engineer more effective proteins for stem cell therapy and longevity research.",
-  "author": "",
-  "category": "",
-  "tags": [],
-  "group": "frontier_lab",
-  "scraped_at": "2025-08-25T02:51:21.590956"
-}
-```
-
-### 정렬 방식
-
-- **`fresh`**: 신선도 점수 기반 정렬 (기본값)
-  - 최근 발행된 뉴스가 높은 점수
-  - 시간이 지날수록 점수 감소
-- **`time`**: 발행 시간 순 정렬
-  - 최신 뉴스가 먼저 표시
-
-## 💡 사용 예시
-
-### 기본 뉴스 조회
-```bash
-# 최신 뉴스 10개 조회
-curl "http://localhost:8000/news?limit=10"
-
-# 특정 소스의 뉴스만 조회
-curl "http://localhost:8000/news?source=OpenAI%20Blog&limit=5"
-
-# 검색어로 뉴스 검색
-curl "http://localhost:8000/news?q=GPT-4&limit=10"
-```
-
-### 새로운 Description API 사용
-```bash
-# frontier_lab 그룹의 뉴스 5개 조회
-curl "http://localhost:8000/news/descriptions?group=frontier_lab&limit=5"
-
-# 특정 소스와 그룹으로 필터링
-curl "http://localhost:8000/news/descriptions?source=OpenAI%20Blog&group=frontier_lab&limit=3"
-
-# description에서 검색
-curl "http://localhost:8000/news/descriptions?q=protein&limit=10"
-
-# 모든 그룹 목록 확인
-curl "http://localhost:8000/groups"
-
-# 모든 소스 목록 확인
-curl "http://localhost:8000/sources"
-```
-
-### Python 클라이언트 예시
-```python
-import requests
-
-# API 기본 URL
-base_url = "http://localhost:8000"
-
-# 뉴스 description 조회
-response = requests.get(f"{base_url}/news/descriptions", params={
-    "group": "frontier_lab",
-    "limit": 5,
-    "sort": "fresh"
-})
-
-if response.status_code == 200:
-    data = response.json()
-    print(f"총 {data['total']}개 뉴스 중 {data['count']}개 조회됨")
-    
-    for news in data['data']:
-        print(f"- {news['title']} ({news['source']})")
-        print(f"  {news['description'][:100]}...")
-        print()
-```
-
-## 🧪 개발
-
-### 개발 워크플로우
+## 🐳 Docker 실행
 
 ```bash
-# 1. 개발 의존성 설치
-uv sync --extra dev
+# Docker 이미지 빌드
+docker build -t redfin-api .
 
-# 2. 코드 포맷팅
-make format
-
-# 3. 린팅 검사
-make lint
-
-# 4. 테스트 실행
-make test
-
-# 5. 모든 검사 실행
-make check
+# 컨테이너 실행
+docker run -p 8000:8000 redfin-api
 ```
 
-### 개별 도구 사용
+## 🧪 테스트
 
 ```bash
-# 코드 포맷팅
-black src/ tests/
-isort src/ tests/
+# 테스트 실행
+pytest
 
-# 린팅
-flake8 src/ tests/
-mypy src/
-
-# 테스트
-pytest tests/ -v
-pytest tests/ --cov=src/redfin_api --cov-report=html
+# 특정 테스트 파일 실행
+pytest tests/test_news_api.py
 ```
 
-### 커밋 전 검사
+## 📝 개발 가이드
 
-```bash
-# 커밋 전 모든 검사 실행
-make pre-commit
-```
+### 새로운 API 엔드포인트 추가
 
-## 📁 프로젝트 구조
+1. `app/api/` 디렉토리에 새 라우터 파일 생성
+2. `app/main.py`에 라우터 등록
+3. 필요한 스키마를 `app/schemas/`에 추가
+4. 비즈니스 로직을 `app/services/`에 구현
 
-```
-redfin_api/
-├── src/
-│   └── redfin_api/
-│       ├── __init__.py          # 패키지 초기화
-│       ├── main.py              # FastAPI 앱 (메인 파일)
-│       ├── models.py            # Pydantic 모델
-│       └── config.py            # 설정 관리
-├── scripts/
-│   ├── start.sh                # Linux/macOS 시작 스크립트
-│   └── start.ps1               # Windows 시작 스크립트
-├── tests/
-│   ├── __init__.py
-│   ├── conftest.py             # pytest 설정
-│   └── test_api.py             # API 테스트
-├── data/                       # 데이터 파일 디렉토리
-├── run.py                      # 메인 실행 스크립트
-├── pyproject.toml              # 프로젝트 설정 (uv)
-├── env.example                 # 환경 변수 예제
-├── .gitignore                  # Git 무시 파일
-├── .dockerignore               # Docker 무시 파일
-├── Dockerfile                  # Docker 이미지 설정
-├── docker-compose.yml          # Docker Compose 설정
-├── Makefile                    # 개발 명령어 모음
-└── README.md                   # 프로젝트 문서
-```
+### 새로운 서비스 추가
 
-## 🔧 문제 해결
+1. `app/services/` 디렉토리에 서비스 클래스 생성
+2. 필요한 의존성을 `requirements.txt`에 추가
+3. 설정을 `app/core/config.py`에 추가
 
-### 일반적인 문제
+## 🔄 마이그레이션 가이드
 
-#### Import 오류가 발생하는 경우
-```bash
-# 1. 프로젝트 루트에서 실행하고 있는지 확인
-pwd  # redfin_api 디렉토리인지 확인
+### 기존 코드에서 새 구조로
 
-# 2. 가상환경이 활성화되어 있는지 확인
-which python  # venv 경로인지 확인
+기존 `src/redfin_api/` 구조에서 새로운 `app/` 구조로 마이그레이션되었습니다:
 
-# 3. 의존성 재설치
-uv sync
-# 또는
-pip install -e .
-```
+- `models.py` → `app/schemas/news.py`
+- `config.py` → `app/core/config.py`
+- `main.py` → `app/main.py`
+- `load_data.py` → `app/utils/data_loader.py`
 
-#### 뉴스 파일을 찾을 수 없는 경우
-```bash
-# 1. 환경 변수 확인
-echo $NEWS_FILE
+기존 import 문을 새로운 경로로 업데이트하세요.
 
-# 2. 파일 존재 확인
-ls -la data/ai_news.jsonl
+## 📊 성능 최적화
 
-# 3. 샘플 데이터 생성
-mkdir -p data
-echo '{"source": "Test", "title": "Test News", "link": "https://example.com", "published": "2024-01-01T12:00:00Z", "summary": "Test summary", "authors": ["Test Author"], "tags": ["test"]}' > data/ai_news.jsonl
-```
+- 데이터 캐싱으로 반복 쿼리 최적화
+- MongoDB 인덱싱 권장
+- 대용량 데이터 처리를 위한 배치 처리 지원
 
-#### MongoDB 연결 오류
-```bash
-# 1. MongoDB 서비스 상태 확인
-# Ubuntu/Debian
-sudo systemctl status mongodb
-
-# macOS
-brew services list | grep mongodb
-
-# 2. MongoDB 연결 테스트
-mongosh mongodb://localhost:27017
-```
-
-#### Docker 관련 문제
-```bash
-# 1. Docker 서비스 상태 확인
-docker --version
-docker-compose --version
-
-# 2. 컨테이너 로그 확인
-docker-compose logs redfin-api
-
-# 3. 컨테이너 재시작
-docker-compose restart redfin-api
-```
-
-### 디버깅
-
-#### 로그 레벨 설정
-```bash
-# .env 파일에 추가
-LOG_LEVEL=DEBUG
-```
-
-#### API 헬스체크
-```bash
-# 서버 상태 확인
-curl http://localhost:8000/health
-
-# 상세 정보 확인
-curl http://localhost:8000/docs
-```
-
-#### 테스트 실행
-```bash
-# 단위 테스트
-pytest tests/ -v
-
-# 특정 테스트만 실행
-pytest tests/test_api.py::test_health_endpoint -v
-```
-
-## 🚀 성능 최적화
-
-### 캐시 관리
-- 뉴스 데이터는 메모리에 캐시됨
-- `refresh=true` 파라미터로 캐시 강제 새로고침
-- 파일 백엔드: 파일 변경 시 수동 새로고침 필요
-- MongoDB 백엔드: 실시간 데이터 업데이트
-
-### 검색 최적화
-- 제목, 요약, 태그에서 텍스트 검색
-- 소스별 필터링으로 검색 범위 제한
-- 페이지네이션으로 대용량 데이터 처리
-
-## 🔒 보안
-
-### CORS 설정
-- 기본적으로 모든 도메인 허용 (`CORS_ORIGINS=*`)
-- 프로덕션 환경에서는 특정 도메인만 허용하도록 설정
-- 환경 변수 `CORS_ORIGINS`로 제어
-
-### 입력 검증
-- Pydantic 모델을 통한 자동 입력 검증
-- 쿼리 파라미터 범위 제한 (limit: 1-100)
-- 정렬 방식 패턴 검증
-
-## 🤝 기여
+## 🤝 기여하기
 
 1. Fork the repository
 2. Create a feature branch
@@ -610,7 +186,7 @@ pytest tests/test_api.py::test_health_endpoint -v
 
 ## 📄 라이선스
 
-MIT License
+이 프로젝트는 MIT 라이선스 하에 배포됩니다.
 
 ## 📞 지원
 
