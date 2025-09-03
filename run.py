@@ -4,8 +4,7 @@ RedFin API 서버 실행 스크립트
 """
 
 import uvicorn
-from src.redfin_api.main import app
-from src.redfin_api.config import API_HOST, API_PORT, API_RELOAD
+from app.core.config import API_HOST, API_PORT, API_RELOAD
 
 def main():
     """메인 실행 함수"""
@@ -19,7 +18,7 @@ def main():
     
     try:
         uvicorn.run(
-            "src.redfin_api.main:app",
+            "app.main:app",
             host=API_HOST,
             port=API_PORT,
             reload=API_RELOAD,
