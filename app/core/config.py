@@ -15,7 +15,8 @@ class DatabaseSettings(BaseModel):
     """데이터베이스 설정"""
     uri: Optional[str] = None
     database: str = "redfin"
-    collection: str = "news"
+    articles_collection: str = "articles"
+    news_collection: str = "news"
 
 
 class APISettings(BaseModel):
@@ -65,16 +66,21 @@ class Settings(BaseSettings):
     
     # 환경 변수 매핑
     @property
-    def mongo_uri(self) -> Optional[str]:
-        return os.getenv("MONGO_URI") or self.database.uri
+    def mongo_uri(self) -> str:
+        """MongoDB 연결 URI"""
+        return os.getenv("MONGO_URI") or "mongodb://redfin:Redfin7620%21@localhost:27017/redfin?authSource=admin"
     
     @property
     def mongo_db(self) -> str:
         return os.getenv("MONGO_DB") or self.database.database
     
     @property
-    def mongo_col(self) -> str:
-        return os.getenv("MONGO_COL") or self.database.collection
+    def mongo_articles_col(self) -> str:
+        return os.getenv("MONGO_ARTICLES_COL") or self.database.articles_collection
+    
+    @property
+    def mongo_news_col(self) -> str:
+        return os.getenv("MONGO_NEWS_COL") or self.database.news_collection
     
     @property
     def api_host(self) -> str:
@@ -101,7 +107,8 @@ BACKEND = settings.backend
 NEWS_FILE = settings.news_file
 MONGO_URI = settings.mongo_uri
 MONGO_DB = settings.mongo_db
-MONGO_COL = settings.mongo_col
+MONGO_ARTICLES_COL = settings.mongo_articles_col
+MONGO_NEWS_COL = settings.mongo_news_col
 API_HOST = settings.api_host
 API_PORT = settings.api_port
 API_RELOAD = settings.api_reload

@@ -6,7 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .core.config import settings
+from .core.database import database
 from .api.news import router as news_router
+from .api.articles import router as articles_router
 
 # FastAPI 앱 초기화
 app = FastAPI(
@@ -28,6 +30,19 @@ app.add_middleware(
 
 # API 라우터 등록
 app.include_router(news_router, prefix="/api/v1")
+app.include_router(articles_router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """애플리케이션 시작 시 실행"""
+    await database.connect()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """애플리케이션 종료 시 실행"""
+    await database.disconnect()
 
 
 @app.get("/")
@@ -37,7 +52,11 @@ async def root():
         "message": "RedFin API 서비스",
         "version": settings.app_version,
         "docs": "/docs",
-        "health": "/api/v1/news/health"
+        "endpoints": {
+            "news": "/api/v1/news",
+            "articles": "/api/v1/articles",
+            "health": "/api/v1/news/health"
+        }
     }
 
 

@@ -10,10 +10,21 @@ from .news import (
     NewsQuery
 )
 
+from .article import (
+    ArticleResponse,
+    ArticleCreateRequest,
+    ArticleUpdateRequest,
+    ArticleListResponse
+)
+
 __all__ = [
     "NewsEntry",
     "NewsOut", 
     "NewsDescriptionResponse",
     "HealthResponse",
-    "NewsQuery"
+    "NewsQuery",
+    "ArticleResponse",
+    "ArticleCreateRequest", 
+    "ArticleUpdateRequest",
+    "ArticleListResponse"
 ]
