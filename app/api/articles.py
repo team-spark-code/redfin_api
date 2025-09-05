@@ -50,7 +50,7 @@ async def get_article(
 @router.get("/", response_model=ArticleListResponse)
 async def get_articles(
     page: int = Query(1, ge=1, description="페이지 번호"),
-    size: int = Query(10, ge=1, le=100, description="페이지 크기"),
+    size: int = Query(10, ge=1, le=200, description="페이지 크기"),
     search: Optional[str] = Query(None, description="검색어 (제목, 요약, 본문, 키워드)"),
     tags: Optional[List[str]] = Query(None, description="태그 필터"),
     include_news: bool = Query(False, description="news 컬렉션도 포함하여 조회")
@@ -78,6 +78,22 @@ async def get_articles(
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"기사 목록 조회 중 오류가 발생했습니다: {str(e)}")
+
+
+@router.get("/all", response_model=ArticleListResponse)
+async def get_all_articles():
+    """articles 컬렉션의 전체 기사 조회 (페이지네이션 없음)"""
+    try:
+        # articles 컬렉션 전체 조회
+        result = await article_service.get_articles(
+            skip=0,
+            limit=1000,  # 합리적인 크기로 설정
+            search=None,
+            tags=None
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"전체 기사 조회 중 오류가 발생했습니다: {str(e)}")
 
 
 @router.put("/{article_id}", response_model=ArticleResponse)

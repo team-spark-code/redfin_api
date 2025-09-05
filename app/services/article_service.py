@@ -29,9 +29,12 @@ class ArticleService:
     
     def _convert_to_response(self, doc: Dict[str, Any]) -> ArticleResponse:
         """MongoDB 문서를 응답 스키마로 변환"""
+        # _id를 id로 변환
         doc["id"] = str(doc["_id"])
         del doc["_id"]
-        return ArticleResponse(**doc)
+        
+        # alias를 사용하여 ArticleResponse 생성
+        return ArticleResponse.model_validate(doc)
     
     async def create_article(self, article_data: ArticleCreate) -> ArticleResponse:
         """새 기사 생성"""
@@ -72,41 +75,53 @@ class ArticleService:
         tags: Optional[List[str]] = None
     ) -> ArticleListResponse:
         """기사 목록 조회"""
-        collection = self._get_articles_collection()
-        
-        # 검색 조건 구성
-        filter_dict = {}
-        
-        if search:
-            filter_dict["$or"] = [
-                {"Title": {"$regex": search, "$options": "i"}},
-                {"Summary": {"$regex": search, "$options": "i"}},
-                {"body": {"$regex": search, "$options": "i"}},
-                {"keywords": {"$regex": search, "$options": "i"}}
-            ]
-        
-        if tags:
-            filter_dict["tags"] = {"$in": tags}
-        
-        # 목록 조회 (정렬 없이)
-        cursor = collection.find(filter_dict).skip(skip).limit(limit)
-        docs = await cursor.to_list(length=limit)
-        
-        # 전체 개수 조회 (간단한 방식)
         try:
-            total = await collection.count_documents(filter_dict)
-        except Exception:
-            # count_documents가 실패하면 find로 대략적인 개수 계산
-            total = len(docs) if docs else 0
-        
-        items = [self._convert_to_response(doc) for doc in docs]
-        
-        return ArticleListResponse(
-            items=items,
-            total=total,
-            page=(skip // limit) + 1,
-            size=limit
-        )
+            collection = self._get_articles_collection()
+            print(f"컬렉션 가져오기 성공: {self.articles_collection_name}")
+            
+            # 검색 조건 구성
+            filter_dict = {}
+            
+            if search:
+                filter_dict["$or"] = [
+                    {"Title": {"$regex": search, "$options": "i"}},
+                    {"Summary": {"$regex": search, "$options": "i"}},
+                    {"body": {"$regex": search, "$options": "i"}},
+                    {"keywords": {"$regex": search, "$options": "i"}}
+                ]
+            
+            if tags:
+                filter_dict["tags"] = {"$in": tags}
+            
+            print(f"필터 조건: {filter_dict}")
+            
+            # 목록 조회 (정렬 없이)
+            cursor = collection.find(filter_dict).skip(skip).limit(limit)
+            docs = await cursor.to_list(length=limit)
+            print(f"조회된 문서 수: {len(docs)}")
+            
+            # 전체 개수 조회 (find 방식으로 변경)
+            try:
+                all_docs = await collection.find(filter_dict).to_list(length=None)
+                total = len(all_docs)
+                print(f"전체 문서 수: {total}")
+            except Exception as e:
+                print(f"전체 개수 조회 실패: {e}")
+                # find가 실패하면 docs 길이로 대략적인 개수 계산
+                total = len(docs) if docs else 0
+            
+            items = [self._convert_to_response(doc) for doc in docs]
+            print(f"변환된 아이템 수: {len(items)}")
+            
+            return ArticleListResponse(
+                items=items,
+                total=total,
+                page=(skip // limit) + 1,
+                size=limit
+            )
+        except Exception as e:
+            print(f"get_articles 오류: {e}")
+            raise
     
     async def update_article(self, article_id: str, update_data: ArticleUpdate) -> Optional[ArticleResponse]:
         """기사 업데이트"""
