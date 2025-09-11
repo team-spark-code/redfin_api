@@ -21,11 +21,12 @@ on:
         default: "linux/amd64,linux/arm64"
         type: string
 
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
-  # Docker Hub 계정 (필요 시 변경)
   DOCKERHUB_NAMESPACE: "sungminwoo0612"
-  # 이미지 공통 prefix (리포명 기반)
-  REPO_SLUG: ${{ github.event.repository.name }}
 
 jobs:
   detect-images:
@@ -33,46 +34,60 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
+      has_images: ${{ steps.gen.outputs.has_images }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Find Dockerfiles & generate matrix
         id: gen
+        shell: bash
         run: |
           set -euo pipefail
-          # Git으로 추적되는 Dockerfile만 대상으로 함
+
+          # Git으로 추적되는 Dockerfile(또는 dockerfile) 검색
           files=$(git ls-files | grep -E '(^|/)[Dd]ockerfile$' || true)
 
-          # 없으면 루트 Dockerfile 시도
+          # 루트 Dockerfile fallback
           if [ -z "${files}" ] && [ -f Dockerfile ]; then
             files="Dockerfile"
           fi
 
           if [ -z "${files}" ]; then
-            echo "No Dockerfile found."
-            echo '{"include":[]}' > matrix.json
+            jq -cn '{include:[]}' > matrix.json
           else
-            echo "Found:"
+            echo "Found Dockerfiles:"
             echo "${files}"
-            # JSON 배열 생성: [{ "context":"path", "dockerfile":"path/Dockerfile", "name":"suffix" }, ...]
-            jq -cn --arg files "$files" '
-              ($files | split("\n") | map(select(length>0)) ) as $arr
-              | { include:
-                    [ foreach $arr[] as $f ([];
-                        . + [{
-                          context: ( $f | rtrimstr("/Dockerfile") | rtrimstr("/dockerfile") | if .=="" then "." else . end ),
-                          dockerfile: $f,
-                          # 컨텍스트 디렉토리명이 루트(.)면 "app", 아니면 디렉토리명
-                          name: ( ($f | rtrimstr("/Dockerfile") | rtrimstr("/dockerfile")) as $ctx
-                                  | ( if $ctx=="" then "app" else ($ctx | split("/") | last) end ) )
-                        }]
-                      )
-                    ]
+
+            # name은 이미지 suffix로 사용되므로 소문자/안전문자만(스페이스 등 제거)
+            jq -rnc --arg files "$files" '
+              ($files | split("\n") | map(select(length>0))) as $arr
+              | {
+                  include: [
+                    foreach $arr[] as $f ([];
+                      . + [{
+                        context: (
+                          $f
+                          | rtrimstr("/Dockerfile")
+                          | rtrimstr("/dockerfile")
+                          | if .=="" then "." else . end
+                        ),
+                        dockerfile: $f,
+                        name: (
+                          ($f | rtrimstr("/Dockerfile") | rtrimstr("/dockerfile")) as $ctx
+                          | (if $ctx=="" then "app" else ($ctx | split("/") | last) end)
+                          | ascii_downcase
+                          | gsub("[^a-z0-9._-]"; "-")
+                        )
+                      }]
+                    )
+                  ]
                 }' > matrix.json
           fi
 
-          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
+          COUNT=$(jq '.include | length' matrix.json)
+          echo "has_images=$([ "$COUNT" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
 
       - name: Show matrix
         run: cat matrix.json
@@ -80,7 +95,7 @@ jobs:
   build:
     name: Build ${{ matrix.name }}
     needs: detect-images
-    if: ${{ fromJSON(needs.detect-images.outputs.matrix).include != '' }}
+    if: ${{ needs.detect-images.outputs.has_images == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -88,12 +103,16 @@ jobs:
 
     permissions:
       contents: read
-      packages: write   # GHCR에 푸시 시 필요
-      id-token: write   # OIDC (향후 사용 대비)
+      packages: write
+      id-token: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Normalize repo slug to lowercase
+        run: |
+          echo "REPO_SLUG=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -101,7 +120,6 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 수동 실행 입력 없을 때 기본값
       - name: Resolve inputs
         id: vars
         run: |
@@ -110,7 +128,6 @@ jobs:
           echo "registries=$REG" >> "$GITHUB_OUTPUT"
           echo "platforms=$PLAT" >> "$GITHUB_OUTPUT"
 
-      # 로그인 (조건부)
       - name: Login to GHCR
         if: contains(steps.vars.outputs.registries, 'ghcr') || contains(steps.vars.outputs.registries, 'both')
         uses: docker/login-action@v3
@@ -126,20 +143,20 @@ jobs:
           username: ${{ env.DOCKERHUB_NAMESPACE }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 태그/라벨 메타데이터 생성
       - name: Docker meta (GHCR + Docker Hub)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # 여러 이미지 대상: 선택된 레지스트리만 포함
           images: |
             ${{ (contains(steps.vars.outputs.registries, 'ghcr') || contains(steps.vars.outputs.registries, 'both')) && format('ghcr.io/{0}/{1}-{2}', github.repository_owner, env.REPO_SLUG, matrix.name) || '' }}
             ${{ (contains(steps.vars.outputs.registries, 'dockerhub') || contains(steps.vars.outputs.registries, 'both')) && format('{0}/{1}-{2}', env.DOCKERHUB_NAMESPACE, env.REPO_SLUG, matrix.name) || '' }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
+            type=ref,event=tag               # release-* 같이 semver 아닌 태그 지원
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
             type=sha
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
@@ -157,4 +174,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
+          sbom: true           # 원치 않으면 false
+          provenance: true     # 원치 않으면 false
