@@ -44,37 +44,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files=$(git ls-files | grep -E '(^|/)[Dd]ockerfile$' || true)
-          if [ -z "${files}" ] && [ -f Dockerfile ]; then files="Dockerfile"; fi
-
+          
+          # Dockerfile 검색 (git ls-files와 find 조합으로 더 안정적)
+          files=""
+          if git ls-files | grep -q -E '(^|/)[Dd]ockerfile$'; then
+            files=$(git ls-files | grep -E '(^|/)[Dd]ockerfile$')
+          elif find . -name "Dockerfile" -o -name "dockerfile" | grep -q .; then
+            files=$(find . -name "Dockerfile" -o -name "dockerfile" | sed 's|^\./||')
+          fi
+          
+          echo "Found Dockerfiles: $files"
+          
           if [ -z "${files}" ]; then
+            echo "No Dockerfiles found"
             jq -cn '{include:[]}' > matrix.json
           else
-            jq -rnc --arg files "$files" '
-              ($files | split("\n") | map(select(length>0))) as $arr
-              | {
-                  include: [
-                    foreach $arr[] as $f ([];
-                      . + [{
-                        context: (
-                          $f
-                          | rtrimstr("/Dockerfile")
-                          | rtrimstr("/dockerfile")
-                          | if .=="" then "." else . end
-                        ),
-                        dockerfile: $f,
-                        name: (
-                          ($f | rtrimstr("/Dockerfile") | rtrimstr("/dockerfile")) as $ctx
-                          | (if $ctx=="" then "app" else ($ctx | split("/") | last) end)
-                          | ascii_downcase
-                          | gsub("[^a-z0-9._-]"; "-")
-                        )
-                      }]
-                    )
-                  ]
-                }' > matrix.json
+            # 더 간단하고 안전한 matrix 생성
+            echo "$files" | while IFS= read -r dockerfile; do
+              if [ -n "$dockerfile" ]; then
+                context=$(dirname "$dockerfile")
+                if [ "$context" = "." ]; then
+                  context=""
+                  name="app"
+                else
+                  name=$(basename "$context")
+                fi
+                
+                # 이름 정규화 (소문자, 하이픈으로 변환)
+                name=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
+                
+                echo "{\"context\":\"$context\",\"dockerfile\":\"$dockerfile\",\"name\":\"$name\"}"
+              fi
+            done | jq -s '{include: .}' > matrix.json
           fi
-
+          
+          # Matrix 유효성 검증
+          if ! jq empty matrix.json 2>/dev/null; then
+            echo "Error: Invalid JSON in matrix.json"
+            cat matrix.json
+            exit 1
+          fi
+          
           COUNT=$(jq '.include | length' matrix.json)
           echo "has_images=$([ "$COUNT" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "matrix=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
@@ -83,14 +93,14 @@ jobs:
         run: cat matrix.json
 
   build:
-    name: Build ${{ matrix.name }}
+    name: Build ${{ matrix.target.name }}
     needs: detect-images
     if: ${{ needs.detect-images.outputs.has_images == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.detect-images.outputs.matrix).include }}
+        target: ${{ fromJSON(needs.detect-images.outputs.matrix).include }}
 
     permissions:
       contents: read
@@ -139,8 +149,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ (contains(steps.vars.outputs.registries, 'ghcr') || contains(steps.vars.outputs.registries, 'both')) && format('ghcr.io/{0}/{1}-{2}', github.repository_owner, env.REPO_SLUG, matrix.name) || '' }}
-            ${{ (contains(steps.vars.outputs.registries, 'dockerhub') || contains(steps.vars.outputs.registries, 'both')) && format('{0}/{1}-{2}', env.DOCKERHUB_NAMESPACE, env.REPO_SLUG, matrix.name) || '' }}
+            ${{ (contains(steps.vars.outputs.registries, 'ghcr') || contains(steps.vars.outputs.registries, 'both')) && format('ghcr.io/{0}/{1}-{2}', github.repository_owner, env.REPO_SLUG, matrix.target.name) || '' }}
+            ${{ (contains(steps.vars.outputs.registries, 'dockerhub') || contains(steps.vars.outputs.registries, 'both')) && format('{0}/{1}-{2}', env.DOCKERHUB_NAMESPACE, env.REPO_SLUG, matrix.target.name) || '' }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -152,13 +162,13 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=${{ env.REPO_SLUG }}-${{ matrix.name }}
+            org.opencontainers.image.title=${{ env.REPO_SLUG }}-${{ matrix.target.name }}
 
       - name: Build & Push
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          context: ${{ matrix.target.context }}
+          file: ${{ matrix.target.dockerfile }}
           push: ${{ github.event_name != 'pull_request' }}
           platforms: ${{ steps.vars.outputs.platforms }}
           labels: ${{ steps.meta.outputs.labels }}
