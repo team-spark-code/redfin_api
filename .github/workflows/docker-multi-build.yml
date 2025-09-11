@@ -1,0 +1,160 @@
+# .github/workflows/docker-multi-build.yml
+name: Build & Push Docker Images (multi)
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*.*.*", "release-*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      registries:
+        description: "Target registry (ghcr|dockerhub|both)"
+        required: true
+        default: "both"
+        type: choice
+        options: [ "ghcr", "dockerhub", "both" ]
+      platforms:
+        description: "Target platforms"
+        required: true
+        default: "linux/amd64,linux/arm64"
+        type: string
+
+env:
+  # Docker Hub 계정 (필요 시 변경)
+  DOCKERHUB_NAMESPACE: "sungminwoo0612"
+  # 이미지 공통 prefix (리포명 기반)
+  REPO_SLUG: ${{ github.event.repository.name }}
+
+jobs:
+  detect-images:
+    name: Detect Dockerfiles
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find Dockerfiles & generate matrix
+        id: gen
+        run: |
+          set -euo pipefail
+          # Git으로 추적되는 Dockerfile만 대상으로 함
+          files=$(git ls-files | grep -E '(^|/)[Dd]ockerfile$' || true)
+
+          # 없으면 루트 Dockerfile 시도
+          if [ -z "${files}" ] && [ -f Dockerfile ]; then
+            files="Dockerfile"
+          fi
+
+          if [ -z "${files}" ]; then
+            echo "No Dockerfile found."
+            echo '{"include":[]}' > matrix.json
+          else
+            echo "Found:"
+            echo "${files}"
+            # JSON 배열 생성: [{ "context":"path", "dockerfile":"path/Dockerfile", "name":"suffix" }, ...]
+            jq -cn --arg files "$files" '
+              ($files | split("\n") | map(select(length>0)) ) as $arr
+              | { include:
+                    [ foreach $arr[] as $f ([];
+                        . + [{
+                          context: ( $f | rtrimstr("/Dockerfile") | rtrimstr("/dockerfile") | if .=="" then "." else . end ),
+                          dockerfile: $f,
+                          # 컨텍스트 디렉토리명이 루트(.)면 "app", 아니면 디렉토리명
+                          name: ( ($f | rtrimstr("/Dockerfile") | rtrimstr("/dockerfile")) as $ctx
+                                  | ( if $ctx=="" then "app" else ($ctx | split("/") | last) end ) )
+                        }]
+                      )
+                    ]
+                }' > matrix.json
+          fi
+
+          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Show matrix
+        run: cat matrix.json
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: detect-images
+    if: ${{ fromJSON(needs.detect-images.outputs.matrix).include != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect-images.outputs.matrix) }}
+
+    permissions:
+      contents: read
+      packages: write   # GHCR에 푸시 시 필요
+      id-token: write   # OIDC (향후 사용 대비)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 수동 실행 입력 없을 때 기본값
+      - name: Resolve inputs
+        id: vars
+        run: |
+          REG="${{ inputs.registries || 'both' }}"
+          PLAT="${{ inputs.platforms || 'linux/amd64,linux/arm64' }}"
+          echo "registries=$REG" >> "$GITHUB_OUTPUT"
+          echo "platforms=$PLAT" >> "$GITHUB_OUTPUT"
+
+      # 로그인 (조건부)
+      - name: Login to GHCR
+        if: contains(steps.vars.outputs.registries, 'ghcr') || contains(steps.vars.outputs.registries, 'both')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: contains(steps.vars.outputs.registries, 'dockerhub') || contains(steps.vars.outputs.registries, 'both')
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_NAMESPACE }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 태그/라벨 메타데이터 생성
+      - name: Docker meta (GHCR + Docker Hub)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # 여러 이미지 대상: 선택된 레지스트리만 포함
+          images: |
+            ${{ (contains(steps.vars.outputs.registries, 'ghcr') || contains(steps.vars.outputs.registries, 'both')) && format('ghcr.io/{0}/{1}-{2}', github.repository_owner, env.REPO_SLUG, matrix.name) || '' }}
+            ${{ (contains(steps.vars.outputs.registries, 'dockerhub') || contains(steps.vars.outputs.registries, 'both')) && format('{0}/{1}-{2}', env.DOCKERHUB_NAMESPACE, env.REPO_SLUG, matrix.name) || '' }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+          labels: |
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ env.REPO_SLUG }}-${{ matrix.name }}
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          platforms: ${{ steps.vars.outputs.platforms }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
