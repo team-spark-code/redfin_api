@@ -136,11 +136,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Debug Docker Hub credentials
+        if: contains(steps.vars.outputs.registries, 'dockerhub') || contains(steps.vars.outputs.registries, 'both')
+        run: |
+          echo "Docker Hub Username: ${{ vars.DOCKERHUB_NAMESPACE }}"
+          echo "Docker Hub Token length: ${#DOCKERHUB_TOKEN}"
+          echo "Docker Hub Token (first 10 chars): ${DOCKERHUB_TOKEN:0:10}..."
+
       - name: Login to Docker Hub
         if: contains(steps.vars.outputs.registries, 'dockerhub') || contains(steps.vars.outputs.registries, 'both')
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_NAMESPACE }}
+          username: ${{ vars.DOCKERHUB_NAMESPACE:-'sungminwoo0612' }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker meta (GHCR + Docker Hub)
