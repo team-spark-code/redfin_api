@@ -44,22 +44,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          # Git으로 추적되는 Dockerfile(또는 dockerfile) 검색
           files=$(git ls-files | grep -E '(^|/)[Dd]ockerfile$' || true)
-
-          # 루트 Dockerfile fallback
-          if [ -z "${files}" ] && [ -f Dockerfile ]; then
-            files="Dockerfile"
-          fi
+          if [ -z "${files}" ] && [ -f Dockerfile ]; then files="Dockerfile"; fi
 
           if [ -z "${files}" ]; then
             jq -cn '{include:[]}' > matrix.json
           else
-            echo "Found Dockerfiles:"
-            echo "${files}"
-
-            # name은 이미지 suffix로 사용되므로 소문자/안전문자만(스페이스 등 제거)
             jq -rnc --arg files "$files" '
               ($files | split("\n") | map(select(length>0))) as $arr
               | {
@@ -99,7 +89,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.detect-images.outputs.matrix) }}
+      matrix:
+        include: ${{ fromJSON(needs.detect-images.outputs.matrix).include }}
 
     permissions:
       contents: read
@@ -153,7 +144,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=ref,event=tag               # release-* 같이 semver 아닌 태그 지원
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
@@ -174,5 +165,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          sbom: true           # 원치 않으면 false
-          provenance: true     # 원치 않으면 false
+          sbom: true
+          provenance: true
