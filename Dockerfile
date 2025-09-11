@@ -1,5 +1,5 @@
 # RedFin API Dockerfile - 프로덕션 최적화
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # 빌드 단계에서 필요한 패키지 설치
 RUN apt-get update && apt-get install -y \
@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # 프로덕션 이미지
-FROM python:3.11-slim as production
+FROM python:3.11-slim AS production
 
 # 보안을 위한 비루트 사용자 생성
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -36,7 +36,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
 
 # 소스 코드 복사
-COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser run.py ./
 
 # 사용자 변경
