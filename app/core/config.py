@@ -76,10 +76,12 @@ class Settings(BaseSettings):
     
     @property
     def mongo_articles_col(self) -> str:
+        print(f"MONGO_ARTICLES_COL: {os.getenv('MONGO_ARTICLES_COL')}")
         return os.getenv("MONGO_ARTICLES_COL") or self.database.articles_collection
     
     @property
     def mongo_news_col(self) -> str:
+        print(f"MONGO_NEWS_COL: {os.getenv('MONGO_NEWS_COL')}")
         return os.getenv("MONGO_NEWS_COL") or self.database.news_collection
     
     @property

@@ -3,7 +3,7 @@ Article 모델 정의
 """
 from datetime import datetime
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from bson import ObjectId
 
 
@@ -41,6 +41,22 @@ class ArticleBase(BaseModel):
     tags: list[str] = Field(default_factory=list, alias="tags", description="태그 목록")
     updated_at: Optional[str] = Field(None, alias="updated_at", description="수정일시")
     created_at: Optional[str] = Field(None, alias="created_at", description="생성일시")
+    
+    @validator('category')
+    def validate_category(cls, v):
+        """카테고리 유효성 검증"""
+        if v is None:
+            return v
+        
+        valid_categories = {
+            "Research", "Technology & Product", "Market & Corporate", 
+            "Policy & Regulation", "Social Discussion", "Incidents & Safety", "Misc"
+        }
+        
+        if v not in valid_categories:
+            raise ValueError(f"유효하지 않은 카테고리입니다. 허용된 카테고리: {', '.join(valid_categories)}")
+        
+        return v
 
 
 class ArticleCreate(ArticleBase):

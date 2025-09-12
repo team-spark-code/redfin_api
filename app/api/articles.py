@@ -10,7 +10,8 @@ from ..schemas.article import (
     ArticleResponse,
     ArticleCreateRequest,
     ArticleUpdateRequest,
-    ArticleListResponse
+    ArticleListResponse,
+    CategoryListResponse
 )
 from ..models.article import ArticleCreate, ArticleUpdate
 
@@ -34,17 +35,26 @@ async def create_article(article_data: ArticleCreateRequest):
         raise HTTPException(status_code=500, detail=f"기사 생성 중 오류가 발생했습니다: {str(e)}")
 
 
-@router.get("/{article_id}", response_model=ArticleResponse)
-async def get_article(
-    article_id: str = Path(..., description="기사 ID", example="68b97ad1e7c23a73720de215")
-):
-    """ID로 기사 조회"""
-    result = await article_service.get_article(article_id)
-    
-    if not result:
-        raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다")
-    
-    return result
+@router.get("/all", response_model=ArticleListResponse)
+async def get_all_articles():
+    """전체 기사 조회 (페이지네이션 없음)"""
+    try:
+        print(f"get_all_articles 호출됨")
+        
+        # articles 컬렉션만 조회
+        result = await article_service.get_all_articles()
+        
+        print(f"결과 반환 - 총 {result.total}개, 아이템 {len(result.items)}개")
+        return result
+    except Exception as e:
+        print(f"get_all_articles 오류: {e}")
+        # 오류 발생 시 빈 결과 반환
+        return ArticleListResponse(
+            items=[],
+            total=0,
+            page=1,
+            size=0
+        )
 
 
 @router.get("/", response_model=ArticleListResponse)
@@ -80,20 +90,17 @@ async def get_articles(
         raise HTTPException(status_code=500, detail=f"기사 목록 조회 중 오류가 발생했습니다: {str(e)}")
 
 
-@router.get("/all", response_model=ArticleListResponse)
-async def get_all_articles():
-    """articles 컬렉션의 전체 기사 조회 (페이지네이션 없음)"""
-    try:
-        # articles 컬렉션 전체 조회
-        result = await article_service.get_articles(
-            skip=0,
-            limit=1000,  # 합리적인 크기로 설정
-            search=None,
-            tags=None
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"전체 기사 조회 중 오류가 발생했습니다: {str(e)}")
+@router.get("/{article_id}", response_model=ArticleResponse)
+async def get_article(
+    article_id: str = Path(..., description="기사 ID", example="68b97ad1e7c23a73720de215")
+):
+    """ID로 기사 조회"""
+    result = await article_service.get_article(article_id)
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다")
+    
+    return result
 
 
 @router.put("/{article_id}", response_model=ArticleResponse)
@@ -146,6 +153,42 @@ async def get_article_count():
         return {"total_count": count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"기사 개수 조회 중 오류가 발생했습니다: {str(e)}")
+
+
+@router.get("/categories", response_model=CategoryListResponse)
+async def get_categories():
+    """모든 카테고리 목록 조회 (각 카테고리별 기사 수 포함)"""
+    try:
+        result = await article_service.get_categories()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"카테고리 목록 조회 중 오류가 발생했습니다: {str(e)}")
+
+
+@router.get("/category/{category}", response_model=ArticleListResponse)
+async def get_articles_by_category(
+    category: str = Path(..., description="카테고리명", example="Research"),
+    page: int = Query(1, ge=1, description="페이지 번호"),
+    size: int = Query(10, ge=1, le=200, description="페이지 크기"),
+    search: Optional[str] = Query(None, description="검색어 (제목, 요약, 본문, 키워드)"),
+    tags: Optional[List[str]] = Query(None, description="태그 필터")
+):
+    """특정 카테고리의 기사 조회"""
+    try:
+        skip = (page - 1) * size
+        
+        result = await article_service.get_articles_by_category(
+            category=category,
+            skip=skip,
+            limit=size,
+            search=search,
+            tags=tags
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"카테고리별 기사 조회 중 오류가 발생했습니다: {str(e)}")
 
 
 @router.get("/health/check")
