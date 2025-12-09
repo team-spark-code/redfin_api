@@ -36,12 +36,7 @@ from app.core.config import settings
 
 ## 🚀 실행 방법
 
-### 새로운 실행 스크립트
-```bash
-python run_app.py
-```
-
-### 기존 실행 스크립트 (하위 호환성)
+### 실행 스크립트
 ```bash
 python run.py
 ```

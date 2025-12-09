@@ -43,7 +43,7 @@ redfin_api/
 ├── pyproject.toml         # 프로젝트 설정
 ├── Dockerfile             # Docker 이미지 빌드
 ├── docker-compose.yml     # Docker Compose 설정
-├── run_app.py            # 애플리케이션 실행 스크립트
+├── run.py                # 애플리케이션 실행 스크립트
 └── README.md             # 메인 문서
 ```
 
@@ -90,14 +90,11 @@ CORS_ORIGINS=*
 ### 3. 애플리케이션 실행
 
 ```bash
-# 방법 1: Python 스크립트로 실행
-python run_app.py
+# 방법 1: Python 스크립트로 실행 (권장)
+python run.py
 
 # 방법 2: uvicorn으로 직접 실행
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# 방법 3: 기존 run.py 사용 (하위 호환성)
-python run.py
 ```
 
 ## 📚 API 문서
