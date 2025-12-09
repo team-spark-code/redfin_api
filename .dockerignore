@@ -28,8 +28,9 @@ MANIFEST
 
 # Virtual environments
 .env
+.env.local
+.env.production
 .venv
-env/
 venv/
 ENV/
 env.bak/
@@ -58,10 +59,10 @@ htmlcov/
 .tox/
 .nox/
 
-# Documentation
-docs/
-*.md
-!README.md
+# Documentation (선택적 - 필요시 주석 해제)
+# docs/
+# *.md
+# !README.md
 
 # Development
 Makefile
@@ -78,3 +79,10 @@ logs/
 *.temp
 temp/
 tmp/
+
+# CI/CD
+.github/
+Jenkinsfile
+
+# Lock files (선택적)
+uv.lock
