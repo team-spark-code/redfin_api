@@ -1,15 +1,11 @@
 """
 뉴스 서비스 - 비즈니스 로직 처리
 """
-import json
 import logging
 from datetime import datetime
-from pathlib import Path
 from typing import List, Dict, Any, Optional
-from pymongo import MongoClient
-from pymongo.collection import Collection
 
-from ..core.config import settings
+from ..repositories.news_repository import NewsRepository
 from ..schemas.news import NewsEntry, NewsOut, NewsQuery
 
 logger = logging.getLogger(__name__)
@@ -18,69 +14,12 @@ logger = logging.getLogger(__name__)
 class NewsService:
     """뉴스 데이터 처리 서비스"""
     
-    def __init__(self):
-        self.backend = settings.backend
-        self.news_file = settings.news_file
+    def __init__(self, news_repo: Optional[NewsRepository] = None):
+        self.news_repo = news_repo or NewsRepository()
         self._cache: List[Dict[str, Any]] = []
         self._cache_timestamp: Optional[float] = None
-        
-        # MongoDB 연결 (백엔드가 MONGO인 경우)
-        self.mongo_client: Optional[MongoClient] = None
-        self.mongo_collection: Optional[Collection] = None
-        
-        if self.backend == "MONGO" and settings.mongo_uri:
-            try:
-                self.mongo_client = MongoClient(settings.mongo_uri)
-                self.mongo_collection = self.mongo_client[settings.mongo_db][settings.mongo_col]
-                logger.info(f"MongoDB 연결 성공: {settings.mongo_db}.{settings.mongo_col}")
-            except Exception as e:
-                logger.error(f"MongoDB 연결 실패: {e}")
-                self.backend = "FILE"  # MongoDB 실패 시 파일 백엔드로 폴백
     
-    def _load_file_data(self) -> List[Dict[str, Any]]:
-        """파일에서 뉴스 데이터 로드"""
-        try:
-            if not self.news_file.exists():
-                logger.warning(f"뉴스 파일이 존재하지 않음: {self.news_file}")
-                return []
-            
-            data = []
-            with open(self.news_file, 'r', encoding='utf-8') as f:
-                for line_num, line in enumerate(f, 1):
-                    try:
-                        if line.strip():
-                            item = json.loads(line.strip())
-                            data.append(item)
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"라인 {line_num} JSON 파싱 오류: {e}")
-                        continue
-            
-            logger.info(f"파일에서 {len(data)}개 뉴스 항목 로드")
-            return data
-            
-        except Exception as e:
-            logger.error(f"파일 데이터 로드 오류: {e}")
-            return []
-    
-    def _load_mongo_data(self, query: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """MongoDB에서 뉴스 데이터 로드"""
-        try:
-            if not self.mongo_collection:
-                logger.error("MongoDB 컬렉션이 초기화되지 않음")
-                return []
-            
-            filter_query = query or {}
-            cursor = self.mongo_collection.find(filter_query)
-            data = list(cursor)
-            
-            logger.info(f"MongoDB에서 {len(data)}개 뉴스 항목 로드")
-            return data
-            
-        except Exception as e:
-            logger.error(f"MongoDB 데이터 로드 오류: {e}")
-            return []
-    
-    def get_news_data(self, refresh: bool = False) -> List[Dict[str, Any]]:
+    async def get_news_data(self, refresh: bool = False) -> List[Dict[str, Any]]:
         """뉴스 데이터 조회 (캐시 또는 백엔드에서)"""
         current_time = datetime.now().timestamp()
         
@@ -89,11 +28,8 @@ class NewsService:
             current_time - self._cache_timestamp < 300):  # 5분 캐시
             return self._cache
         
-        # 백엔드에서 데이터 로드
-        if self.backend == "MONGO":
-            data = self._load_mongo_data()
-        else:
-            data = self._load_file_data()
+        # Repository를 통해 데이터 로드
+        data = await self.news_repo.get_all()
         
         # 캐시 업데이트
         self._cache = data
@@ -101,9 +37,9 @@ class NewsService:
         
         return data
     
-    def search_news(self, query: NewsQuery) -> List[Dict[str, Any]]:
+    async def search_news(self, query: NewsQuery) -> tuple[List[Dict[str, Any]], int]:
         """뉴스 검색"""
-        data = self.get_news_data(refresh=query.refresh)
+        data = await self.get_news_data(refresh=query.refresh)
         
         # 검색어 필터링
         if query.q:
@@ -193,21 +129,20 @@ class NewsService:
             logger.warning(f"날짜 파싱 오류: {e}")
             return 0.0
     
-    def get_health_status(self) -> Dict[str, Any]:
+    async def get_health_status(self) -> Dict[str, Any]:
         """헬스체크 상태 반환"""
-        data = self.get_news_data()
+        data = await self.get_news_data()
         return {
             "ok": True,
             "count": len(data),
-            "backend": self.backend,
-            "version": "0.1.0"
+            "backend": self.news_repo.backend,
+            "version": "0.2.0"
         }
     
-    def __del__(self):
-        """소멸자 - MongoDB 연결 정리"""
-        if self.mongo_client:
-            self.mongo_client.close()
-
-
-# 전역 서비스 인스턴스
-news_service = NewsService()
+    async def get_sources(self) -> List[str]:
+        """사용 가능한 소스 목록 조회"""
+        return await self.news_repo.get_sources()
+    
+    async def get_groups(self) -> List[str]:
+        """사용 가능한 그룹 목록 조회"""
+        return await self.news_repo.get_groups()
