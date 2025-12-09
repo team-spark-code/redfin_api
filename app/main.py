@@ -7,8 +7,7 @@ from fastapi.responses import JSONResponse
 
 from .core.config import settings
 from .core.database import database
-from .api.news import router as news_router
-from .api.articles import router as articles_router
+from .api.v1.api import api_router
 
 # FastAPI 앱 초기화
 app = FastAPI(
@@ -29,8 +28,7 @@ app.add_middleware(
 )
 
 # API 라우터 등록
-app.include_router(news_router, prefix="/api/v1")
-app.include_router(articles_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
@@ -56,7 +54,8 @@ async def root():
             "news": "/api/v1/news",
             "articles": "/api/v1/articles",
             "health": "/api/v1/news/health"
-        }
+        },
+        "docs": "/docs"
     }
 
 
