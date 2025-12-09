@@ -2,50 +2,46 @@
 
 AI RSS News API Service - FastAPI 기반 뉴스 추천 및 분석 서비스
 
+## 📋 개요
+
+RedFin API는 RSS 뉴스 피드를 수집, 분석, 제공하는 RESTful API 서비스입니다.<br>
+클린 아키텍처 원칙을 따르며, Repository 패턴과 의존성 주입을 통해<br>
+유지보수성과 테스트 용이성을 확보한 FastAPI 기반 애플리케이션입니다.
+
+### 주요 특징
+
+- **클린 아키텍처**: Repository 패턴, 의존성 주입, 계층 분리
+- **다중 백엔드 지원**: 파일(JSONL) 및 MongoDB 백엔드
+- **API 버전 관리**: `/api/v1/` 구조로 버전별 엔드포인트 관리
+- **스마트 검색**: 텍스트 검색, 소스/그룹 필터링, 신선도 점수 기반 정렬
+- **자동 문서화**: Swagger UI 및 ReDoc 제공
+
+### 기술 스택
+
+- **프레임워크**: FastAPI 0.115+
+- **데이터베이스**: MongoDB (Motor 비동기 드라이버)
+- **검증**: Pydantic 2.8+
+- **서버**: Uvicorn
+- **테스트**: Pytest
+
 ## 🏗️ 프로젝트 구조
 
 ```
 redfin_api/
 ├── app/                    # FastAPI 애플리케이션
-│   ├── api/               # API 라우터
-│   │   ├── v1/            # API v1 엔드포인트
-│   │   │   └── endpoints/ # 엔드포인트 구현
-│   │   └── deps.py        # 의존성 주입
-│   ├── core/              # 핵심 설정 및 의존성
-│   │   ├── config.py      # 애플리케이션 설정
-│   │   ├── database.py    # 데이터베이스 연결
-│   │   ├── container.py   # 의존성 컨테이너
-│   │   └── exceptions.py  # 커스텀 예외
+│   ├── api/v1/endpoints/  # API 엔드포인트
 │   ├── repositories/      # 데이터 접근 계층
-│   │   ├── base.py        # BaseRepository
-│   │   ├── news_repository.py
-│   │   └── article_repository.py
 │   ├── services/          # 비즈니스 로직
-│   │   ├── news_service.py
-│   │   └── article_service.py
-│   ├── models/            # 데이터베이스 모델
+│   ├── core/              # 설정 및 의존성 컨테이너
 │   ├── schemas/           # Pydantic 스키마
-│   ├── utils/             # 유틸리티 함수
-│   └── main.py            # FastAPI 앱 메인
+│   └── models/            # 도메인 모델
 ├── docs/                  # 문서
-│   ├── build.md           # 빌드 가이드
-│   ├── api.md             # API 문서
-│   ├── migration.md       # 마이그레이션 가이드
-│   └── test-report.md     # 테스트 리포트
-├── scripts/               # 스크립트
-│   ├── example_usage.py   # API 사용 예제
-│   ├── migrate_to_new_structure.py
-│   └── ...
+├── scripts/               # 유틸리티 스크립트
 ├── tests/                 # 테스트 코드
-├── data/                  # 데이터 파일
-├── .env                   # 환경 변수 (env.example 참고)
-├── requirements.txt       # Python 의존성
-├── pyproject.toml         # 프로젝트 설정
-├── Dockerfile             # Docker 이미지 빌드
-├── docker-compose.yml     # Docker Compose 설정
-├── run.py                # 애플리케이션 실행 스크립트
-└── README.md             # 메인 문서
+└── run.py                # 애플리케이션 실행 스크립트
 ```
+
+상세한 구조는 [개발 가이드](#-개발-가이드) 섹션을 참고하세요.
 
 ## 🚀 빠른 시작
 
@@ -97,27 +93,39 @@ python run.py
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## 📚 API 문서
-
-서버 실행 후 다음 URL에서 API 문서를 확인할 수 있습니다:
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
 ## 🔌 API 엔드포인트
 
 ### 뉴스 API (`/api/v1/news`)
 
-- `GET /` - 뉴스 목록 조회
+- `GET /` - 뉴스 목록 조회 (검색, 필터링, 정렬 지원)
 - `GET /description` - 뉴스 description 응답 형식으로 조회
 - `GET /health` - 헬스체크
 - `GET /sources` - 사용 가능한 뉴스 소스 목록
 - `GET /groups` - 사용 가능한 뉴스 그룹 목록
 
+### 기사 API (`/api/v1/articles`)
+
+- `GET /` - 기사 목록 조회 (페이지네이션, 검색, 태그 필터)
+- `POST /` - 새 기사 생성
+- `GET /{id}` - ID로 기사 조회
+- `PUT /{id}` - 기사 업데이트
+- `DELETE /{id}` - 기사 삭제
+- `GET /categories` - 카테고리 목록 조회
+- `GET /category/{category}` - 카테고리별 기사 조회
+
 ### 기본 엔드포인트
 
 - `GET /` - 루트 정보
 - `GET /health` - 기본 헬스체크
+
+## 📚 API 문서
+
+서버 실행 후 다음 URL에서 상세한 API 문서를 확인할 수 있습니다:
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+더 자세한 API 문서는 [docs/api.md](docs/api.md)를 참고하세요.
 
 ## 🔧 주요 기능
 
@@ -169,9 +177,60 @@ pytest tests/test_news_api.py
 
 이 프로젝트는 **클린 아키텍처** 원칙을 따릅니다:
 
-- **Repository 패턴**: 데이터 접근 계층 분리
-- **의존성 주입**: `core/container.py`를 통한 중앙화된 의존성 관리
-- **API 버전 관리**: `api/v1/` 구조로 버전별 엔드포인트 관리
+```
+┌─────────────────────────────────────────┐
+│         API Layer (v1/endpoints)        │
+│         - HTTP 요청/응답 처리            │
+└─────────────────┬───────────────────────┘
+                  │
+┌─────────────────▼───────────────────────┐
+│         Service Layer                   │
+│         - 비즈니스 로직                  │
+└─────────────────┬───────────────────────┘
+                  │
+┌─────────────────▼───────────────────────┐
+│         Repository Layer                │
+│         - 데이터 접근 계층               │
+└─────────────────┬───────────────────────┘
+                  │
+┌─────────────────▼───────────────────────┐
+│         Database (MongoDB/File)         │
+└─────────────────────────────────────────┘
+```
+
+**핵심 원칙:**
+- **Repository 패턴**: 데이터 접근 계층 분리 (`app/repositories/`)
+- **의존성 주입**: `app/core/container.py`를 통한 중앙화된 의존성 관리
+- **API 버전 관리**: `app/api/v1/` 구조로 버전별 엔드포인트 관리
+- **비동기 처리**: 모든 서비스 메서드가 async/await 사용
+
+### 상세 프로젝트 구조
+
+```
+app/
+├── api/
+│   ├── v1/
+│   │   ├── endpoints/      # 엔드포인트 구현
+│   │   │   ├── news.py
+│   │   │   └── articles.py
+│   │   └── api.py          # 라우터 통합
+│   └── deps.py             # 의존성 주입 함수
+├── repositories/           # 데이터 접근 계층
+│   ├── base.py            # BaseRepository
+│   ├── news_repository.py
+│   └── article_repository.py
+├── services/              # 비즈니스 로직
+│   ├── news_service.py
+│   └── article_service.py
+├── core/                  # 핵심 설정
+│   ├── config.py          # 애플리케이션 설정
+│   ├── database.py        # 데이터베이스 연결
+│   ├── container.py       # 의존성 컨테이너
+│   └── exceptions.py      # 커스텀 예외
+├── schemas/               # Pydantic 스키마
+├── models/                # 도메인 모델
+└── main.py                # FastAPI 앱 진입점
+```
 
 ### 새로운 API 엔드포인트 추가
 
@@ -193,16 +252,16 @@ pytest tests/test_news_api.py
 
 ### API 사용 예제
 
-API 사용 예제는 `scripts/example_usage.py`를 참고하세요.
+API 사용 예제는 [`scripts/example_usage.py`](scripts/example_usage.py)를 참고하세요.
 
-## 📚 추가 문서
+## 📚 문서
 
-더 자세한 정보는 다음 문서를 참고하세요:
+상세한 문서는 [`docs/`](docs/) 디렉토리에서 확인할 수 있습니다:
 
-- **[빌드 가이드](docs/build.md)** - Docker 이미지 빌드 및 배포 방법
-- **[API 문서](docs/api.md)** - API 기능 상세 설명
-- **[마이그레이션 가이드](docs/migration.md)** - 기존 구조에서 새 구조로 마이그레이션
-- **[테스트 리포트](docs/test-report.md)** - 테스트 결과 및 커버리지
+- [🏗️ 빌드 가이드](docs/build.md) - Docker 이미지 빌드 및 배포 방법
+- [📖 API 문서](docs/api.md) - API 기능 상세 설명 및 엔드포인트 명세
+- [🔄 마이그레이션 가이드](docs/migration.md) - 기존 구조에서 새 구조로 마이그레이션
+- [🧪 테스트 리포트](docs/test-report.md) - 테스트 결과 및 커버리지
 
 ## 📊 성능 최적화
 
