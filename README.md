@@ -8,24 +8,43 @@ AI RSS News API Service - FastAPI 기반 뉴스 추천 및 분석 서비스
 redfin_api/
 ├── app/                    # FastAPI 애플리케이션
 │   ├── api/               # API 라우터
-│   │   └── news.py        # 뉴스 관련 엔드포인트
+│   │   ├── v1/            # API v1 엔드포인트
+│   │   │   └── endpoints/ # 엔드포인트 구현
+│   │   └── deps.py        # 의존성 주입
 │   ├── core/              # 핵심 설정 및 의존성
-│   │   └── config.py      # 애플리케이션 설정
+│   │   ├── config.py      # 애플리케이션 설정
+│   │   ├── database.py    # 데이터베이스 연결
+│   │   ├── container.py   # 의존성 컨테이너
+│   │   └── exceptions.py  # 커스텀 예외
+│   ├── repositories/      # 데이터 접근 계층
+│   │   ├── base.py        # BaseRepository
+│   │   ├── news_repository.py
+│   │   └── article_repository.py
+│   ├── services/          # 비즈니스 로직
+│   │   ├── news_service.py
+│   │   └── article_service.py
 │   ├── models/            # 데이터베이스 모델
 │   ├── schemas/           # Pydantic 스키마
-│   │   └── news.py        # 뉴스 관련 스키마
-│   ├── services/          # 비즈니스 로직
-│   │   └── news_service.py # 뉴스 서비스
 │   ├── utils/             # 유틸리티 함수
-│   │   └── data_loader.py # 데이터 로더
-│   ├── __init__.py
 │   └── main.py            # FastAPI 앱 메인
-├── data/                  # 데이터 파일
+├── docs/                  # 문서
+│   ├── build.md           # 빌드 가이드
+│   ├── api.md             # API 문서
+│   ├── migration.md       # 마이그레이션 가이드
+│   └── test-report.md     # 테스트 리포트
+├── scripts/               # 스크립트
+│   ├── example_usage.py   # API 사용 예제
+│   ├── migrate_to_new_structure.py
+│   └── ...
 ├── tests/                 # 테스트 코드
-├── .env                   # 환경 변수
+├── data/                  # 데이터 파일
+├── .env                   # 환경 변수 (env.example 참고)
 ├── requirements.txt       # Python 의존성
+├── pyproject.toml         # 프로젝트 설정
+├── Dockerfile             # Docker 이미지 빌드
+├── docker-compose.yml     # Docker Compose 설정
 ├── run_app.py            # 애플리케이션 실행 스크립트
-└── README.md
+└── README.md             # 메인 문서
 ```
 
 ## 🚀 빠른 시작
@@ -124,12 +143,17 @@ python run.py
 
 ## 🐳 Docker 실행
 
+자세한 Docker 빌드 및 실행 방법은 [빌드 가이드](docs/build.md)를 참고하세요.
+
 ```bash
 # Docker 이미지 빌드
-docker build -t redfin-api .
+docker build --target production -t redfin-api:latest .
 
-# 컨테이너 실행
-docker run -p 8000:8000 redfin-api
+# Docker Compose로 실행
+docker-compose up -d
+
+# 컨테이너 직접 실행
+docker run -p 8000:8000 redfin-api:latest
 ```
 
 ## 🧪 테스트
@@ -144,31 +168,44 @@ pytest tests/test_news_api.py
 
 ## 📝 개발 가이드
 
+### 아키텍처 개요
+
+이 프로젝트는 **클린 아키텍처** 원칙을 따릅니다:
+
+- **Repository 패턴**: 데이터 접근 계층 분리
+- **의존성 주입**: `core/container.py`를 통한 중앙화된 의존성 관리
+- **API 버전 관리**: `api/v1/` 구조로 버전별 엔드포인트 관리
+
 ### 새로운 API 엔드포인트 추가
 
-1. `app/api/` 디렉토리에 새 라우터 파일 생성
-2. `app/main.py`에 라우터 등록
+1. `app/api/v1/endpoints/` 디렉토리에 새 엔드포인트 파일 생성
+2. `app/api/v1/api.py`에 라우터 등록
 3. 필요한 스키마를 `app/schemas/`에 추가
-4. 비즈니스 로직을 `app/services/`에 구현
+4. Repository를 `app/repositories/`에 구현
+5. 비즈니스 로직을 `app/services/`에 구현
+6. `app/api/deps.py`에 의존성 주입 함수 추가
 
 ### 새로운 서비스 추가
 
-1. `app/services/` 디렉토리에 서비스 클래스 생성
-2. 필요한 의존성을 `requirements.txt`에 추가
-3. 설정을 `app/core/config.py`에 추가
+1. `app/repositories/`에 Repository 구현
+2. `app/services/` 디렉토리에 서비스 클래스 생성
+3. `app/core/container.py`에 팩토리 메서드 추가
+4. `app/api/deps.py`에 의존성 주입 함수 추가
+5. 필요한 의존성을 `requirements.txt`에 추가
+6. 설정을 `app/core/config.py`에 추가
 
-## 🔄 마이그레이션 가이드
+### API 사용 예제
 
-### 기존 코드에서 새 구조로
+API 사용 예제는 `scripts/example_usage.py`를 참고하세요.
 
-기존 `src/redfin_api/` 구조에서 새로운 `app/` 구조로 마이그레이션되었습니다:
+## 📚 추가 문서
 
-- `models.py` → `app/schemas/news.py`
-- `config.py` → `app/core/config.py`
-- `main.py` → `app/main.py`
-- `load_data.py` → `app/utils/data_loader.py`
+더 자세한 정보는 다음 문서를 참고하세요:
 
-기존 import 문을 새로운 경로로 업데이트하세요.
+- **[빌드 가이드](docs/build.md)** - Docker 이미지 빌드 및 배포 방법
+- **[API 문서](docs/api.md)** - API 기능 상세 설명
+- **[마이그레이션 가이드](docs/migration.md)** - 기존 구조에서 새 구조로 마이그레이션
+- **[테스트 리포트](docs/test-report.md)** - 테스트 결과 및 커버리지
 
 ## 📊 성능 최적화
 
