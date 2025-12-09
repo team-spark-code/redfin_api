@@ -3,6 +3,16 @@
 RedFin API 구조 마이그레이션 스크립트
 
 기존 src/redfin_api/ 구조에서 새로운 app/ 구조로 마이그레이션
+
+⚠️ 주의: 이 스크립트는 이미 완료된 마이그레이션을 위한 것입니다.
+현재 프로젝트는 이미 app/ 구조로 마이그레이션되었으며, 
+클린 아키텍처(Repository 패턴, 의존성 주입)를 따르고 있습니다.
+
+새로운 구조:
+- app/api/v1/endpoints/ - API 엔드포인트
+- app/repositories/ - 데이터 접근 계층
+- app/services/ - 비즈니스 로직
+- app/core/ - 핵심 설정 및 의존성 컨테이너
 """
 import os
 import shutil

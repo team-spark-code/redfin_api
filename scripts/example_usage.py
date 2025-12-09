@@ -1,5 +1,13 @@
 """
-Article CRUD API 사용 예제
+RedFin API 사용 예제
+
+이 스크립트는 RedFin API의 주요 엔드포인트 사용법을 보여줍니다.
+새로운 클린 아키텍처 구조 (v1 API)를 사용합니다.
+
+실행 전 확인사항:
+1. 서버가 http://localhost:8000 에서 실행 중이어야 합니다
+2. MongoDB가 설정되어 있다면 연결되어 있어야 합니다
+3. 필요한 경우 .env 파일을 설정하세요
 """
 import asyncio
 import httpx
@@ -15,13 +23,13 @@ async def test_article_crud():
         
         # 1. 새 기사 생성
         print("1. 새 기사 생성")
+        # 새로운 API 스키마에 맞는 요청 데이터
         article_data = {
-            "News ID": "TEST001",
             "Title": "샘플 기사 제목",
             "Summary": "이것은 테스트용 기사 요약입니다. MongoDB와 FastAPI를 사용한 CRUD 작업을 테스트합니다.",
             "URL": "https://example.com/test-article",
             "keywords": "['테스트', 'MongoDB', 'FastAPI', 'CRUD']",
-            "category": "Technology",
+            "category": "Research",
             "body": "이것은 테스트용 기사 본문입니다. MongoDB와 FastAPI를 사용한 CRUD 작업을 테스트합니다. 실제 데이터베이스에 저장되는 내용입니다.",
             "published_at": "2024-01-01 00:00:00",
             "tags": ["policy/Technology", "topic/Testing", "geo/KR"]
@@ -32,8 +40,8 @@ async def test_article_crud():
             article = response.json()
             article_id = article["id"]
             print(f"✅ 기사 생성 성공: ID = {article_id}")
-            print(f"   제목: {article['Title']}")
-            print(f"   뉴스 ID: {article['News ID']}")
+            print(f"   제목: {article['title']}")
+            print(f"   카테고리: {article.get('category', 'N/A')}")
         else:
             print(f"❌ 기사 생성 실패: {response.status_code} - {response.text}")
             return
@@ -46,10 +54,9 @@ async def test_article_crud():
         if response.status_code == 200:
             article = response.json()
             print(f"✅ 기사 조회 성공")
-            print(f"   제목: {article['Title']}")
-            print(f"   뉴스 ID: {article['News ID']}")
-            print(f"   카테고리: {article['category']}")
-            print(f"   태그: {article['tags']}")
+            print(f"   제목: {article['title']}")
+            print(f"   카테고리: {article.get('category', 'N/A')}")
+            print(f"   태그: {article.get('tags', [])}")
         else:
             print(f"❌ 기사 조회 실패: {response.status_code} - {response.text}")
         
@@ -83,9 +90,9 @@ async def test_article_crud():
         if response.status_code == 200:
             article = response.json()
             print(f"✅ 기사 업데이트 성공")
-            print(f"   수정된 제목: {article['Title']}")
-            print(f"   수정된 요약: {article['Summary']}")
-            print(f"   수정된 태그: {article['tags']}")
+            print(f"   수정된 제목: {article['title']}")
+            print(f"   수정된 요약: {article.get('summary', 'N/A')}")
+            print(f"   수정된 태그: {article.get('tags', [])}")
         else:
             print(f"❌ 기사 업데이트 실패: {response.status_code} - {response.text}")
         

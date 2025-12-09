@@ -1,8 +1,20 @@
-# Redfin API 빌드
+# RedFin API 빌드 가이드
 
-본 문서는 Redfin API를 빌드하는 방법을 단계적으로 설명합니다.
+본 문서는 RedFin API를 빌드하고 배포하는 방법을 단계적으로 설명합니다.
 
-docker 환경을 설치하고 아래 작업을 진행해주세요.
+## 사전 요구사항
+
+- Docker 및 Docker Compose 설치
+- Python 3.10+ (로컬 개발 시)
+- MongoDB (MongoDB 백엔드 사용 시)
+
+## 아키텍처
+
+현재 프로젝트는 클린 아키텍처를 따릅니다:
+- **Repository 패턴**: 데이터 접근 계층 분리
+- **의존성 주입**: Container를 통한 의존성 관리
+- **API v1**: `/api/v1/` 엔드포인트 구조
+- **실행 스크립트**: `run.py` (통합된 단일 진입점)
 
 ## 0. 전체 워크플로우
 ```bash
